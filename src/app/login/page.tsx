@@ -32,7 +32,8 @@ export default function LoginPage() {
 
         if (data.autoConnectAvailable && data.processorIp && data.authKey) {
           // Auto-connect successful, set connection and redirect
-          setConnection(data.processorIp, data.authKey);
+          // Pass undefined for authToken and true for fromEnv since we're using env credentials
+          setConnection(data.processorIp, data.authKey, undefined, data.authTokenFromEnv || false);
           router.push("/");
           return;
         }

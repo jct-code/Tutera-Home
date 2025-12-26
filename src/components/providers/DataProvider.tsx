@@ -23,21 +23,31 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // Suppress Next.js dev overlay async params/searchParams warnings (dev-only, doesn't affect production)
   // These warnings are triggered by the component inspector trying to serialize Promise props
+  // Note: Next.js routes these through console.error, not console.warn
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       const originalWarn = console.warn;
+      const originalError = console.error;
+      
+      const shouldSuppress = (message: unknown): boolean => {
+        return typeof message === 'string' && 
+          (message.includes('searchParams') || message.includes('params are being enumerated')) &&
+          message.includes('Promise');
+      };
+      
       console.warn = (...args: Parameters<typeof console.warn>) => {
-        const message = args[0];
-        if (typeof message === 'string' && 
-            (message.includes('searchParams') || message.includes('params are being enumerated')) &&
-            message.includes('Promise')) {
-          // Suppress these specific dev overlay warnings
-          return;
-        }
+        if (shouldSuppress(args[0])) return;
         originalWarn.apply(console, args);
       };
+      
+      console.error = (...args: Parameters<typeof console.error>) => {
+        if (shouldSuppress(args[0])) return;
+        originalError.apply(console, args);
+      };
+      
       return () => {
         console.warn = originalWarn;
+        console.error = originalError;
       };
     }
   }, []);
@@ -84,4 +94,3 @@ export function DataProvider({ children }: DataProviderProps) {
 }
 
 export default DataProvider;
-

@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type {
   Room,
   Light,
@@ -13,7 +14,7 @@ import type {
   MediaRoom,
   QuickAction,
 } from "@/lib/crestron/types";
-import { useAuthStore } from "./authStore";
+import { useAuthStore, refreshAuth } from "./authStore";
 
 interface DeviceState {
   // Data
@@ -57,58 +58,9 @@ interface DeviceState {
   clearAll: () => void;
 }
 
-export const useDeviceStore = create<DeviceState>((set) => ({
-  rooms: [],
-  lights: [],
-  shades: [],
-  scenes: [],
-  thermostats: [],
-  doorLocks: [],
-  sensors: [],
-  securityDevices: [],
-  mediaRooms: [],
-  quickActions: [],
-  isLoading: false,
-  error: null,
-  lastUpdated: null,
-
-  setRooms: (rooms) => set({ rooms }),
-  setLights: (lights) => set({ lights }),
-  setShades: (shades) => set({ shades }),
-  setScenes: (scenes) => set({ scenes }),
-  setThermostats: (thermostats) => set({ thermostats }),
-  setDoorLocks: (doorLocks) => set({ doorLocks }),
-  setSensors: (sensors) => set({ sensors }),
-  setSecurityDevices: (securityDevices) => set({ securityDevices }),
-  setMediaRooms: (mediaRooms) => set({ mediaRooms }),
-  setQuickActions: (quickActions) => set({ quickActions }),
-  setLoading: (isLoading) => set({ isLoading }),
-  setError: (error) => set({ error }),
-  setLastUpdated: (date) => set({ lastUpdated: date }),
-
-  updateLight: (id, updates) =>
-    set((state) => ({
-      lights: state.lights.map((light) =>
-        light.id === id ? { ...light, ...updates } : light
-      ),
-    })),
-
-  updateThermostat: (id, updates) =>
-    set((state) => ({
-      thermostats: state.thermostats.map((thermostat) =>
-        thermostat.id === id ? { ...thermostat, ...updates } : thermostat
-      ),
-    })),
-
-  updateDoorLock: (id, updates) =>
-    set((state) => ({
-      doorLocks: state.doorLocks.map((lock) =>
-        lock.id === id ? { ...lock, ...updates } : lock
-      ),
-    })),
-
-  clearAll: () =>
-    set({
+export const useDeviceStore = create<DeviceState>()(
+  persist(
+    (set) => ({
       rooms: [],
       lights: [],
       shades: [],
@@ -122,8 +74,79 @@ export const useDeviceStore = create<DeviceState>((set) => ({
       isLoading: false,
       error: null,
       lastUpdated: null,
+
+      setRooms: (rooms) => set({ rooms }),
+      setLights: (lights) => set({ lights }),
+      setShades: (shades) => set({ shades }),
+      setScenes: (scenes) => set({ scenes }),
+      setThermostats: (thermostats) => set({ thermostats }),
+      setDoorLocks: (doorLocks) => set({ doorLocks }),
+      setSensors: (sensors) => set({ sensors }),
+      setSecurityDevices: (securityDevices) => set({ securityDevices }),
+      setMediaRooms: (mediaRooms) => set({ mediaRooms }),
+      setQuickActions: (quickActions) => set({ quickActions }),
+      setLoading: (isLoading) => set({ isLoading }),
+      setError: (error) => set({ error }),
+      setLastUpdated: (date) => set({ lastUpdated: date }),
+
+      updateLight: (id, updates) =>
+        set((state) => ({
+          lights: state.lights.map((light) =>
+            light.id === id ? { ...light, ...updates } : light
+          ),
+        })),
+
+      updateThermostat: (id, updates) =>
+        set((state) => ({
+          thermostats: state.thermostats.map((thermostat) =>
+            thermostat.id === id ? { ...thermostat, ...updates } : thermostat
+          ),
+        })),
+
+      updateDoorLock: (id, updates) =>
+        set((state) => ({
+          doorLocks: state.doorLocks.map((lock) =>
+            lock.id === id ? { ...lock, ...updates } : lock
+          ),
+        })),
+
+      clearAll: () =>
+        set({
+          rooms: [],
+          lights: [],
+          shades: [],
+          scenes: [],
+          thermostats: [],
+          doorLocks: [],
+          sensors: [],
+          securityDevices: [],
+          mediaRooms: [],
+          quickActions: [],
+          isLoading: false,
+          error: null,
+          lastUpdated: null,
+        }),
     }),
-}));
+    {
+      name: "crestron-devices",
+      // Persist all device data so it's available immediately on page load
+      partialize: (state) => ({
+        rooms: state.rooms,
+        lights: state.lights,
+        shades: state.shades,
+        scenes: state.scenes,
+        thermostats: state.thermostats,
+        doorLocks: state.doorLocks,
+        sensors: state.sensors,
+        securityDevices: state.securityDevices,
+        mediaRooms: state.mediaRooms,
+        quickActions: state.quickActions,
+        lastUpdated: state.lastUpdated,
+        // Don't persist isLoading or error - these should be transient
+      }),
+    }
+  )
+);
 
 // Fetch helpers
 async function fetchWithAuth(endpoint: string) {
@@ -132,12 +155,17 @@ async function fetchWithAuth(endpoint: string) {
   return response.json();
 }
 
+// Track if we're already attempting to refresh auth to prevent loops
+let isRefreshingAuth = false;
+
 // Fetch all data (rooms, devices, scenes) - used by DataProvider for polling
-export async function fetchAllData() {
+export async function fetchAllData(isRetryAfterRefresh = false) {
   const store = useDeviceStore.getState();
   
   // Skip if already loading to prevent overlap
-  if (store.isLoading) return;
+  if (store.isLoading) {
+    return;
+  }
   
   store.setLoading(true);
   store.setError(null);
@@ -150,14 +178,36 @@ export async function fetchAllData() {
       fetchWithAuth("scenes"),
     ]);
     
-    // Process rooms - only update if we got actual data
-    if (roomsData.success) {
-      const roomsArray = Array.isArray(roomsData.data) 
-        ? roomsData.data 
-        : roomsData.data?.rooms || [];
-      if (roomsArray.length > 0) {
-        store.setRooms(roomsArray);
+    // Check if all responses indicate potential auth failure (empty data or errors)
+    const roomsArray = roomsData.success 
+      ? (Array.isArray(roomsData.data) ? roomsData.data : roomsData.data?.rooms || [])
+      : [];
+    const lightsArray = devicesData.success && devicesData.data?.lights || [];
+    const scenesArray = scenesData.success ? (Array.isArray(scenesData.data) ? scenesData.data : []) : [];
+    
+    // Detect auth failure: if we get empty data from ALL endpoints, auth likely expired
+    const allEmpty = roomsArray.length === 0 && lightsArray.length === 0 && scenesArray.length === 0;
+    
+    // If all data is empty and we haven't already tried refreshing, attempt to refresh auth
+    if (allEmpty && !isRetryAfterRefresh && !isRefreshingAuth) {
+      isRefreshingAuth = true;
+      store.setLoading(false); // Release loading lock for refresh
+      
+      const refreshSuccess = await refreshAuth();
+      isRefreshingAuth = false;
+      
+      if (refreshSuccess) {
+        // Retry fetch with new auth
+        return fetchAllData(true);
+      } else {
+        store.setError("Session expired. Please log in again.");
+        return;
       }
+    }
+    
+    // Process rooms - only update if we got actual data
+    if (roomsData.success && roomsArray.length > 0) {
+      store.setRooms(roomsArray);
     }
     
     // Process devices - only update if we got actual data (don't overwrite with empty)
@@ -187,11 +237,8 @@ export async function fetchAllData() {
     }
     
     // Process scenes - only update if we got actual data
-    if (scenesData.success) {
-      const scenesArray = Array.isArray(scenesData.data) ? scenesData.data : [];
-      if (scenesArray.length > 0) {
-        store.setScenes(scenesArray);
-      }
+    if (scenesData.success && scenesArray.length > 0) {
+      store.setScenes(scenesArray);
     }
     
     // Update timestamp on success

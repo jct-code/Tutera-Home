@@ -29,6 +29,7 @@ export async function GET() {
         autoConnectAvailable: true,
         processorIp,
         authKey: result.data.authKey,
+        authTokenFromEnv: true, // Flag that auth token is from env, so client knows refresh is possible
       });
     }
 
