@@ -112,7 +112,7 @@ export default function RoomPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {roomLights.map((light) => (
                     <motion.div key={light.id} variants={itemVariants}>
-                      <LightCard light={light} />
+                      <LightCard light={light} roomName={room?.name} />
                     </motion.div>
                   ))}
                 </div>

@@ -126,9 +126,21 @@ export class CrestronClient {
   }
 
   async setLightState(payload: LightSetStatePayload): Promise<ApiResponse<void>> {
+    // Crestron API expects: { lights: [{ id, level, time }] }
+    // Convert our payload format to Crestron format
+    const level = payload.level ?? (payload.isOn ? 65535 : 0);
+    const crestronPayload = {
+      lights: [
+        {
+          id: Number(payload.id),
+          level: level,
+          time: 0, // Instant transition
+        },
+      ],
+    };
     return this.request<void>(CRESTRON_ENDPOINTS.LIGHTS_SET_STATE, {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(crestronPayload),
     });
   }
 

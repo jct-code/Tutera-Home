@@ -12,6 +12,7 @@ import { setLightState } from "@/stores/deviceStore";
 interface LightCardProps {
   light: Light;
   compact?: boolean;
+  roomName?: string;
 }
 
 // Convert 0-65535 to 0-100
@@ -24,7 +25,7 @@ function percentToLevel(percent: number): number {
   return Math.round((percent / 100) * 65535);
 }
 
-export function LightCard({ light, compact = false }: LightCardProps) {
+export function LightCard({ light, compact = false, roomName }: LightCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const percent = levelToPercent(light.level);
   const isOn = light.isOn || light.level > 0;
@@ -66,6 +67,7 @@ export function LightCard({ light, compact = false }: LightCardProps) {
                 {light.name}
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
+                {roomName && <span className="text-[var(--text-tertiary)]">{roomName} · </span>}
                 {isOn ? `${percent}%` : "Off"}
               </p>
             </div>
@@ -103,6 +105,7 @@ export function LightCard({ light, compact = false }: LightCardProps) {
           <div>
             <CardTitle>{light.name}</CardTitle>
             <p className="text-sm text-[var(--text-secondary)]">
+              {roomName && <span>{roomName} · </span>}
               {light.subType === "dimmer" ? "Dimmable" : "Switch"}
             </p>
           </div>

@@ -206,8 +206,13 @@ export async function fetchAllData(isRetryAfterRefresh = false) {
     }
     
     // Process rooms - only update if we got actual data
+    // Transform room IDs to strings to match how device roomId fields are stored
     if (roomsData.success && roomsArray.length > 0) {
-      store.setRooms(roomsArray);
+      const transformedRooms = roomsArray.map((room: { id: string | number; name: string }) => ({
+        ...room,
+        id: String(room.id),
+      }));
+      store.setRooms(transformedRooms);
     }
     
     // Process devices - only update if we got actual data (don't overwrite with empty)
@@ -268,7 +273,12 @@ export async function fetchRooms() {
     const data = await fetchWithAuth("rooms");
     if (data.success) {
       const roomsArray = Array.isArray(data.data) ? data.data : data.data?.rooms || [];
-      setRooms(roomsArray);
+      // Transform room IDs to strings to match how device roomId fields are stored
+      const transformedRooms = roomsArray.map((room: { id: string | number; name: string }) => ({
+        ...room,
+        id: String(room.id),
+      }));
+      setRooms(transformedRooms);
     } else {
       setError(data.error);
     }

@@ -17,6 +17,7 @@ import { BottomNavigation, RoomTabs } from "@/components/layout/Navigation";
 import { Card } from "@/components/ui/Card";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { LightCard, LightGroupControl } from "@/components/devices/LightCard";
+import { LightsByRoom } from "@/components/devices/LightsByRoom";
 import { ShadeCard } from "@/components/devices/ShadeCard";
 import { ThermostatCard } from "@/components/devices/ThermostatCard";
 import { SceneGrid } from "@/components/devices/SceneCard";
@@ -260,21 +261,30 @@ export default function Dashboard() {
                     Lights
                   </h2>
                 </div>
-                <div className="space-y-3">
-                  <LightGroupControl lights={filteredLights} />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {filteredLights.slice(0, 6).map((light) => (
-                      <motion.div key={light.id} initial={{ opacity: 1, y: 0 }} animate={{ opacity: 1, y: 0 }}>
-                        <LightCard light={light} compact />
-                      </motion.div>
-                    ))}
+                {/* Show grouped by room when "All Rooms" is selected */}
+                {selectedRoom === null ? (
+                  <LightsByRoom 
+                    lights={lights} 
+                    rooms={rooms}
+                    maxLightsPerRoom={4}
+                    showUnassigned
+                  />
+                ) : (
+                  /* Show flat list when a specific room is selected */
+                  <div className="space-y-3">
+                    <LightGroupControl 
+                      lights={filteredLights} 
+                      roomName={rooms.find(r => r.id === selectedRoom)?.name}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {filteredLights.map((light) => (
+                        <motion.div key={light.id} initial={{ opacity: 1, y: 0 }} animate={{ opacity: 1, y: 0 }}>
+                          <LightCard light={light} compact />
+                        </motion.div>
+                      ))}
+                    </div>
                   </div>
-                  {filteredLights.length > 6 && (
-                    <p className="text-center text-sm text-[var(--text-secondary)]">
-                      +{filteredLights.length - 6} more lights
-                    </p>
-                  )}
-                </div>
+                )}
               </motion.section>
             )}
 

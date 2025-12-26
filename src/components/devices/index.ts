@@ -1,4 +1,5 @@
 export { LightCard, LightGroupControl } from "./LightCard";
+export { LightsByRoom } from "./LightsByRoom";
 export { ShadeCard } from "./ShadeCard";
 export { SceneCard, SceneGrid } from "./SceneCard";
 export { ThermostatCard } from "./ThermostatCard";
