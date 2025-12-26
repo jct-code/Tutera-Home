@@ -9,8 +9,9 @@ import { BottomNavigation } from "@/components/layout/Navigation";
 import { ThermostatCard } from "@/components/devices/ThermostatCard";
 import { SensorCard } from "@/components/devices/SensorCard";
 import { Card } from "@/components/ui/Card";
+import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { useAuthStore } from "@/stores/authStore";
-import { useDeviceStore, fetchAllDevices } from "@/stores/deviceStore";
+import { useDeviceStore, fetchAllData } from "@/stores/deviceStore";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -41,12 +42,6 @@ export default function ClimatePage() {
     }
   }, [isConnected, router]);
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchAllDevices();
-    }
-  }, [isConnected]);
-
   if (!isConnected) return null;
 
   // Calculate averages
@@ -74,13 +69,11 @@ export default function ClimatePage() {
               <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
                 Climate
               </h1>
-              <p className="text-sm text-[var(--text-secondary)]">
-                {thermostats.length} thermostat{thermostats.length !== 1 ? "s" : ""}
-              </p>
+              <RefreshedAt />
             </div>
           </div>
           <button
-            onClick={() => fetchAllDevices()}
+            onClick={() => fetchAllData()}
             disabled={isLoading}
             className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
@@ -170,4 +163,3 @@ export default function ClimatePage() {
     </div>
   );
 }
-

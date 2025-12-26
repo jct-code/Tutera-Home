@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -41,11 +42,15 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center">
-              <Home className="w-4 h-4 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Tutera Home"
+              width={36}
+              height={36}
+              className="rounded-lg"
+            />
             <span className="font-semibold text-[var(--text-primary)] hidden sm:block">
-              Crestron Home
+              Tutera Home
             </span>
           </Link>
 

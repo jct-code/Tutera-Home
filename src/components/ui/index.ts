@@ -3,4 +3,5 @@ export { Button, MotionButton, IconButton } from "./Button";
 export { Toggle, AnimatedToggle } from "./Toggle";
 export { Slider, VerticalSlider } from "./Slider";
 export { Modal, ModalFooter } from "./Modal";
+export { RefreshedAt } from "./RefreshedAt";
 

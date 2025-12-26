@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Home, Wifi, Key, AlertCircle, Loader2 } from "lucide-react";
@@ -10,11 +10,41 @@ import { useAuthStore, login } from "@/stores/authStore";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isConnecting, error } = useAuthStore();
+  const { isConnecting, error, isConnected, setConnection } = useAuthStore();
   
   const [processorIp, setProcessorIp] = useState("");
   const [authToken, setAuthToken] = useState("");
   const [localError, setLocalError] = useState("");
+  const [isAutoConnecting, setIsAutoConnecting] = useState(true);
+
+  // Check for auto-connect on mount
+  useEffect(() => {
+    // If already connected, redirect immediately
+    if (isConnected) {
+      router.push("/");
+      return;
+    }
+
+    const checkAutoConnect = async () => {
+      try {
+        const response = await fetch("/api/crestron/config");
+        const data = await response.json();
+
+        if (data.autoConnectAvailable && data.processorIp && data.authKey) {
+          // Auto-connect successful, set connection and redirect
+          setConnection(data.processorIp, data.authKey);
+          router.push("/");
+          return;
+        }
+      } catch (err) {
+        // Silently fail - user can connect manually
+        console.error("Auto-connect check failed:", err);
+      }
+      setIsAutoConnecting(false);
+    };
+
+    checkAutoConnect();
+  }, [isConnected, router, setConnection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +63,30 @@ export default function LoginPage() {
   };
 
   const displayError = localError || error;
+
+  // Show loading while checking auto-connect
+  if (isAutoConnecting) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--accent)] mb-4">
+            <Home className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-semibold text-[var(--text-primary)] mb-2">
+            Crestron Home
+          </h1>
+          <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Connecting...</span>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">

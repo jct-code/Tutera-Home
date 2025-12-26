@@ -46,6 +46,7 @@ interface DeviceState {
   setQuickActions: (quickActions: QuickAction[]) => void;
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
+  setLastUpdated: (date: Date) => void;
   
   // Optimistic update helpers
   updateLight: (id: string, updates: Partial<Light>) => void;
@@ -72,17 +73,18 @@ export const useDeviceStore = create<DeviceState>((set) => ({
   lastUpdated: null,
 
   setRooms: (rooms) => set({ rooms }),
-  setLights: (lights) => set({ lights, lastUpdated: new Date() }),
-  setShades: (shades) => set({ shades, lastUpdated: new Date() }),
-  setScenes: (scenes) => set({ scenes, lastUpdated: new Date() }),
-  setThermostats: (thermostats) => set({ thermostats, lastUpdated: new Date() }),
-  setDoorLocks: (doorLocks) => set({ doorLocks, lastUpdated: new Date() }),
-  setSensors: (sensors) => set({ sensors, lastUpdated: new Date() }),
-  setSecurityDevices: (securityDevices) => set({ securityDevices, lastUpdated: new Date() }),
-  setMediaRooms: (mediaRooms) => set({ mediaRooms, lastUpdated: new Date() }),
+  setLights: (lights) => set({ lights }),
+  setShades: (shades) => set({ shades }),
+  setScenes: (scenes) => set({ scenes }),
+  setThermostats: (thermostats) => set({ thermostats }),
+  setDoorLocks: (doorLocks) => set({ doorLocks }),
+  setSensors: (sensors) => set({ sensors }),
+  setSecurityDevices: (securityDevices) => set({ securityDevices }),
+  setMediaRooms: (mediaRooms) => set({ mediaRooms }),
   setQuickActions: (quickActions) => set({ quickActions }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
+  setLastUpdated: (date) => set({ lastUpdated: date }),
 
   updateLight: (id, updates) =>
     set((state) => ({
@@ -130,13 +132,96 @@ async function fetchWithAuth(endpoint: string) {
   return response.json();
 }
 
+// Fetch all data (rooms, devices, scenes) - used by DataProvider for polling
+export async function fetchAllData() {
+  const store = useDeviceStore.getState();
+  
+  // Skip if already loading to prevent overlap
+  if (store.isLoading) return;
+  
+  store.setLoading(true);
+  store.setError(null);
+  
+  try {
+    // Fetch all data in parallel
+    const [roomsData, devicesData, scenesData] = await Promise.all([
+      fetchWithAuth("rooms"),
+      fetchWithAuth("devices"),
+      fetchWithAuth("scenes"),
+    ]);
+    
+    // Process rooms - only update if we got actual data
+    if (roomsData.success) {
+      const roomsArray = Array.isArray(roomsData.data) 
+        ? roomsData.data 
+        : roomsData.data?.rooms || [];
+      if (roomsArray.length > 0) {
+        store.setRooms(roomsArray);
+      }
+    }
+    
+    // Process devices - only update if we got actual data (don't overwrite with empty)
+    if (devicesData.success && devicesData.data) {
+      // Only update each device type if we got non-empty data (preserve existing data on partial failures)
+      if (devicesData.data.lights?.length > 0) {
+        store.setLights(devicesData.data.lights);
+      }
+      if (devicesData.data.shades?.length > 0) {
+        store.setShades(devicesData.data.shades);
+      }
+      if (devicesData.data.thermostats?.length > 0) {
+        store.setThermostats(devicesData.data.thermostats);
+      }
+      if (devicesData.data.doorLocks?.length > 0) {
+        store.setDoorLocks(devicesData.data.doorLocks);
+      }
+      if (devicesData.data.sensors?.length > 0) {
+        store.setSensors(devicesData.data.sensors);
+      }
+      if (devicesData.data.securityDevices?.length > 0) {
+        store.setSecurityDevices(devicesData.data.securityDevices);
+      }
+      if (devicesData.data.mediaRooms?.length > 0) {
+        store.setMediaRooms(devicesData.data.mediaRooms);
+      }
+    }
+    
+    // Process scenes - only update if we got actual data
+    if (scenesData.success) {
+      const scenesArray = Array.isArray(scenesData.data) ? scenesData.data : [];
+      if (scenesArray.length > 0) {
+        store.setScenes(scenesArray);
+      }
+    }
+    
+    // Update timestamp on success
+    store.setLastUpdated(new Date());
+    
+    // Check for any errors
+    const errors = [
+      !roomsData.success && roomsData.error,
+      !devicesData.success && devicesData.error,
+      !scenesData.success && scenesData.error,
+    ].filter(Boolean);
+    
+    if (errors.length > 0) {
+      store.setError(errors.join("; "));
+    }
+  } catch (error) {
+    store.setError(error instanceof Error ? error.message : "Failed to fetch data");
+  } finally {
+    store.setLoading(false);
+  }
+}
+
 // Fetch all rooms
 export async function fetchRooms() {
   const { setRooms, setError } = useDeviceStore.getState();
   try {
     const data = await fetchWithAuth("rooms");
     if (data.success) {
-      setRooms(data.data || []);
+      const roomsArray = Array.isArray(data.data) ? data.data : data.data?.rooms || [];
+      setRooms(roomsArray);
     } else {
       setError(data.error);
     }
@@ -147,7 +232,7 @@ export async function fetchRooms() {
 
 // Fetch all devices
 export async function fetchAllDevices() {
-  const { setLoading, setError, setLights, setShades, setThermostats, setDoorLocks, setSensors, setSecurityDevices, setMediaRooms } = useDeviceStore.getState();
+  const { setLoading, setError, setLights, setShades, setThermostats, setDoorLocks, setSensors, setSecurityDevices, setMediaRooms, setLastUpdated } = useDeviceStore.getState();
   
   setLoading(true);
   try {
@@ -160,6 +245,7 @@ export async function fetchAllDevices() {
       setSensors(data.data.sensors || []);
       setSecurityDevices(data.data.securityDevices || []);
       setMediaRooms(data.data.mediaRooms || []);
+      setLastUpdated(new Date());
     } else {
       setError(data.error);
     }
@@ -176,7 +262,8 @@ export async function fetchLights() {
   try {
     const data = await fetchWithAuth("lights");
     if (data.success) {
-      setLights(data.data || []);
+      const lightsArray = Array.isArray(data.data) ? data.data : data.data?.lights || [];
+      setLights(lightsArray);
     } else {
       setError(data.error);
     }
@@ -191,7 +278,8 @@ export async function fetchScenes() {
   try {
     const data = await fetchWithAuth("scenes");
     if (data.success) {
-      setScenes(data.data || []);
+      const scenesArray = Array.isArray(data.data) ? data.data : [];
+      setScenes(scenesArray);
     } else {
       setError(data.error);
     }
@@ -206,7 +294,8 @@ export async function fetchQuickActions() {
   try {
     const data = await fetchWithAuth("quickactions");
     if (data.success) {
-      setQuickActions(data.data || []);
+      const quickActionsArray = Array.isArray(data.data) ? data.data : data.data?.quickActions || [];
+      setQuickActions(quickActionsArray);
     } else {
       setError(data.error);
     }
@@ -235,7 +324,6 @@ export async function setLightState(id: string, level?: number, isOn?: boolean) 
     });
     const data = await response.json();
     if (!data.success) {
-      // Revert on failure - refetch
       fetchLights();
     }
     return data.success;
@@ -321,4 +409,3 @@ export async function setDoorLockState(id: string, isLocked: boolean) {
     return false;
   }
 }
-

@@ -264,4 +264,3 @@ export function getCrestronClient(config?: CrestronClientConfig): CrestronClient
 export function resetCrestronClient() {
   clientInstance = null;
 }
-

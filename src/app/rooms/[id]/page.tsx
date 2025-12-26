@@ -12,8 +12,9 @@ import { ShadeCard } from "@/components/devices/ShadeCard";
 import { ThermostatCard } from "@/components/devices/ThermostatCard";
 import { SensorCard } from "@/components/devices/SensorCard";
 import { Button } from "@/components/ui/Button";
+import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { useAuthStore } from "@/stores/authStore";
-import { useDeviceStore, fetchRooms, fetchAllDevices } from "@/stores/deviceStore";
+import { useDeviceStore, fetchAllData } from "@/stores/deviceStore";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -52,16 +53,9 @@ export default function RoomPage() {
     }
   }, [isConnected, router]);
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchRooms();
-      fetchAllDevices();
-    }
-  }, [isConnected]);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchRooms(), fetchAllDevices()]);
+    await fetchAllData();
     setIsRefreshing(false);
   };
 
@@ -86,17 +80,15 @@ export default function RoomPage() {
               <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
                 {room?.name || "Room"}
               </h1>
-              <p className="text-sm text-[var(--text-secondary)]">
-                {totalDevices} device{totalDevices !== 1 ? "s" : ""}
-              </p>
+              <RefreshedAt />
             </div>
           </div>
           <button
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            disabled={isRefreshing || isLoading}
             className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
-            <RefreshCw className={`w-5 h-5 text-[var(--text-secondary)] ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-5 h-5 text-[var(--text-secondary)] ${isRefreshing || isLoading ? "animate-spin" : ""}`} />
           </button>
         </div>
 
@@ -200,4 +192,3 @@ export default function RoomPage() {
     </div>
   );
 }
-

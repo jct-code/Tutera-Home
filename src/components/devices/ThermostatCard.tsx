@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   Thermometer,
   Flame,
@@ -13,7 +12,7 @@ import {
   Fan,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import type { Thermostat, ThermostatMode, FanMode } from "@/lib/crestron/types";
+import type { Thermostat, ThermostatMode } from "@/lib/crestron/types";
 import { setThermostatSetPoint, setThermostatMode } from "@/stores/deviceStore";
 
 interface ThermostatCardProps {
@@ -223,4 +222,3 @@ export function ThermostatCard({ thermostat, compact = false }: ThermostatCardPr
 }
 
 export default ThermostatCard;
-

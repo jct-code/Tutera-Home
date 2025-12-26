@@ -17,8 +17,9 @@ import { BottomNavigation } from "@/components/layout/Navigation";
 import { LockCard, LockAllButton } from "@/components/devices/LockCard";
 import { SensorCard } from "@/components/devices/SensorCard";
 import { Card } from "@/components/ui/Card";
+import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { useAuthStore } from "@/stores/authStore";
-import { useDeviceStore, fetchAllDevices } from "@/stores/deviceStore";
+import { useDeviceStore, fetchAllData } from "@/stores/deviceStore";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -48,12 +49,6 @@ export default function SecurityPage() {
       router.push("/login");
     }
   }, [isConnected, router]);
-
-  useEffect(() => {
-    if (isConnected) {
-      fetchAllDevices();
-    }
-  }, [isConnected]);
 
   if (!isConnected) return null;
 
@@ -86,15 +81,11 @@ export default function SecurityPage() {
               <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
                 Security
               </h1>
-              <p className={`text-sm font-medium ${
-                allSecure ? "text-[var(--success)]" : "text-[var(--warning)]"
-              }`}>
-                {allSecure ? "All secure" : "Attention needed"}
-              </p>
+              <RefreshedAt />
             </div>
           </div>
           <button
-            onClick={() => fetchAllDevices()}
+            onClick={() => fetchAllData()}
             disabled={isLoading}
             className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
@@ -231,4 +222,3 @@ export default function SecurityPage() {
     </div>
   );
 }
-

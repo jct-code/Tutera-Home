@@ -12,6 +12,34 @@ function getClientConfig(request: NextRequest) {
   return { processorIp, authKey };
 }
 
+// Helper to extract array from potentially nested Crestron response
+function extractArray<T>(data: unknown, key: string): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object' && data !== null && key in data) {
+    return (data as Record<string, T[]>)[key] || [];
+  }
+  return [];
+}
+
+// Transform Crestron scene to our interface format
+interface CrestronScene {
+  id: number;
+  name: string;
+  roomId?: number;
+  isActive?: boolean;
+}
+
+function transformScene(s: CrestronScene) {
+  return {
+    id: String(s.id),
+    name: s.name,
+    type: 'scene' as const,
+    roomId: s.roomId ? String(s.roomId) : undefined,
+    isActive: s.isActive ?? false,
+  };
+}
+
 // GET - Get all scenes
 export async function GET(request: NextRequest) {
   const config = getClientConfig(request);
@@ -27,7 +55,9 @@ export async function GET(request: NextRequest) {
   const result = await client.getScenes();
 
   if (result.success) {
-    return NextResponse.json(result);
+    // Extract and transform scenes
+    const scenesArray = extractArray<CrestronScene>(result.data, 'scenes').map(transformScene);
+    return NextResponse.json({ success: true, data: scenesArray });
   }
 
   return NextResponse.json(result, { status: 500 });
@@ -70,4 +100,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

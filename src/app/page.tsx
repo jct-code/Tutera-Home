@@ -7,7 +7,6 @@ import {
   Lightbulb,
   Thermometer,
   Shield,
-  Palette,
   Blinds,
   RefreshCw,
   ChevronRight,
@@ -16,6 +15,7 @@ import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation, RoomTabs } from "@/components/layout/Navigation";
 import { Card } from "@/components/ui/Card";
+import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { LightCard, LightGroupControl } from "@/components/devices/LightCard";
 import { ShadeCard } from "@/components/devices/ShadeCard";
 import { ThermostatCard } from "@/components/devices/ThermostatCard";
@@ -24,7 +24,7 @@ import { LockAllButton } from "@/components/devices/LockCard";
 import { SensorSummary } from "@/components/devices/SensorCard";
 import { QuickActionsBar } from "@/components/layout/QuickActions";
 import { useAuthStore } from "@/stores/authStore";
-import { useDeviceStore, fetchRooms, fetchAllDevices, fetchScenes } from "@/stores/deviceStore";
+import { useDeviceStore, fetchAllData } from "@/stores/deviceStore";
 
 // Animation variants
 const containerVariants = {
@@ -54,7 +54,6 @@ export default function Dashboard() {
     doorLocks,
     sensors,
     isLoading,
-    lastUpdated,
   } = useDeviceStore();
   
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
@@ -67,15 +66,6 @@ export default function Dashboard() {
     }
   }, [isConnected, router]);
 
-  // Fetch data on mount
-  useEffect(() => {
-    if (isConnected) {
-      fetchRooms();
-      fetchAllDevices();
-      fetchScenes();
-    }
-  }, [isConnected]);
-
   // Filter devices by room
   const filteredLights = selectedRoom 
     ? lights.filter(l => l.roomId === selectedRoom)
@@ -85,10 +75,10 @@ export default function Dashboard() {
     ? shades.filter(s => s.roomId === selectedRoom)
     : shades;
 
-  // Refresh handler
+  // Manual refresh handler
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchRooms(), fetchAllDevices(), fetchScenes()]);
+    await fetchAllData();
     setIsRefreshing(false);
   };
 
@@ -111,18 +101,14 @@ export default function Dashboard() {
             <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
               Welcome Home
           </h1>
-            {lastUpdated && (
-              <p className="text-sm text-[var(--text-secondary)]">
-                Updated {lastUpdated.toLocaleTimeString()}
-              </p>
-            )}
+            <RefreshedAt />
           </div>
           <button
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            disabled={isRefreshing || isLoading}
             className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
-            <RefreshCw className={`w-5 h-5 text-[var(--text-secondary)] ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-5 h-5 text-[var(--text-secondary)] ${isRefreshing || isLoading ? "animate-spin" : ""}`} />
           </button>
         </div>
 
@@ -268,7 +254,7 @@ export default function Dashboard() {
           >
             {/* Lights */}
             {filteredLights.length > 0 && (
-              <section>
+              <motion.section variants={itemVariants} initial="show" animate="show">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                     Lights
@@ -277,8 +263,8 @@ export default function Dashboard() {
                 <div className="space-y-3">
                   <LightGroupControl lights={filteredLights} />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {filteredLights.slice(0, 6).map((light, index) => (
-                      <motion.div key={light.id} variants={itemVariants}>
+                    {filteredLights.slice(0, 6).map((light) => (
+                      <motion.div key={light.id} initial={{ opacity: 1, y: 0 }} animate={{ opacity: 1, y: 0 }}>
                         <LightCard light={light} compact />
                       </motion.div>
                     ))}
@@ -289,7 +275,7 @@ export default function Dashboard() {
                     </p>
                   )}
                 </div>
-              </section>
+              </motion.section>
             )}
 
             {/* Shades */}

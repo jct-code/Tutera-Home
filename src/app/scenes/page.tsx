@@ -7,8 +7,9 @@ import { Palette, RefreshCw } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { SceneCard } from "@/components/devices/SceneCard";
+import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { useAuthStore } from "@/stores/authStore";
-import { useDeviceStore, fetchScenes } from "@/stores/deviceStore";
+import { useDeviceStore, fetchAllData } from "@/stores/deviceStore";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -34,12 +35,6 @@ export default function ScenesPage() {
     }
   }, [isConnected, router]);
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchScenes();
-    }
-  }, [isConnected]);
-
   if (!isConnected) return null;
 
   return (
@@ -57,13 +52,11 @@ export default function ScenesPage() {
               <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
                 Scenes
               </h1>
-              <p className="text-sm text-[var(--text-secondary)]">
-                {scenes.length} available scenes
-              </p>
+              <RefreshedAt />
             </div>
           </div>
           <button
-            onClick={() => fetchScenes()}
+            onClick={() => fetchAllData()}
             disabled={isLoading}
             className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
@@ -102,4 +95,3 @@ export default function ScenesPage() {
     </div>
   );
 }
-
