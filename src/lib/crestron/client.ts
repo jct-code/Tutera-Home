@@ -180,9 +180,25 @@ export class CrestronClient {
   async setThermostatSetPoint(
     payload: ThermostatSetPointPayload
   ): Promise<ApiResponse<void>> {
+    // Build setpoints array per Crestron API spec
+    const setpoints: Array<{ type: string; temperature: number }> = [];
+    
+    if (payload.heatSetPoint !== undefined) {
+      // Convert to DeciFahrenheit (e.g., 72 -> 720)
+      setpoints.push({ type: "Heat", temperature: payload.heatSetPoint * 10 });
+    }
+    if (payload.coolSetPoint !== undefined) {
+      setpoints.push({ type: "Cool", temperature: payload.coolSetPoint * 10 });
+    }
+    
+    const crestronPayload = {
+      id: Number(payload.id),  // Convert string ID to number
+      setpoints,
+    };
+    
     return this.request<void>(CRESTRON_ENDPOINTS.THERMOSTAT_SET_POINT, {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(crestronPayload),
     });
   }
 

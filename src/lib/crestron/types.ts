@@ -94,6 +94,30 @@ export interface ThermostatFanModePayload {
   fanMode: FanMode;
 }
 
+// Thermostat Pairing (for rooms with main thermostat + floor heat)
+export interface ThermostatPair {
+  roomId: string;
+  roomName: string;
+  mainThermostat: Thermostat;       // The thermostat with Heat/Cool/Off capability
+  floorHeat: Thermostat | null;     // The "Floor Heat" thermostat (Heat/Off only)
+}
+
+// Helper to detect if a thermostat is a floor heat unit
+export function isFloorHeat(thermostat: Thermostat): boolean {
+  return thermostat.name.toLowerCase().includes('floor heat');
+}
+
+// Helper to check if room temperature is satisfied (target reached)
+export function isTemperatureSatisfied(thermostat: Thermostat): boolean {
+  if (thermostat.mode === 'heat') {
+    return thermostat.currentTemp >= thermostat.heatSetPoint;
+  }
+  if (thermostat.mode === 'cool') {
+    return thermostat.currentTemp <= thermostat.coolSetPoint;
+  }
+  return false; // Off or auto modes don't have simple satisfaction logic
+}
+
 // Door Lock
 export interface DoorLock extends CrestronDevice {
   type: "lock";

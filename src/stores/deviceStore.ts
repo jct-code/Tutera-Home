@@ -14,7 +14,10 @@ import type {
   SecurityDevice,
   MediaRoom,
   QuickAction,
+  ThermostatPair,
+  ThermostatMode,
 } from "@/lib/crestron/types";
+import { isFloorHeat, isTemperatureSatisfied } from "@/lib/crestron/types";
 import { useAuthStore, refreshAuth } from "./authStore";
 
 interface DeviceState {
@@ -457,6 +460,216 @@ export async function setThermostatMode(id: string, mode: string) {
     return data.success;
   } catch {
     return false;
+  }
+}
+
+// Get thermostat pairs grouped by room
+export function getThermostatPairs(): ThermostatPair[] {
+  const { thermostats, rooms } = useDeviceStore.getState();
+  
+  // Group thermostats by roomId
+  const roomGroups = new Map<string, Thermostat[]>();
+  
+  for (const thermostat of thermostats) {
+    if (!thermostat.roomId) continue;
+    const existing = roomGroups.get(thermostat.roomId) || [];
+    existing.push(thermostat);
+    roomGroups.set(thermostat.roomId, existing);
+  }
+  
+  // Convert to ThermostatPair format
+  const pairs: ThermostatPair[] = [];
+  
+  for (const [roomId, roomThermostats] of roomGroups) {
+    const room = rooms.find(r => r.id === roomId);
+    const roomName = room?.name || `Room ${roomId}`;
+    
+    // Find floor heat and main thermostat
+    const floorHeat = roomThermostats.find(t => isFloorHeat(t)) || null;
+    const mainThermostat = roomThermostats.find(t => !isFloorHeat(t));
+    
+    // If we have a main thermostat, create a pair
+    if (mainThermostat) {
+      pairs.push({
+        roomId,
+        roomName,
+        mainThermostat,
+        floorHeat,
+      });
+    } else if (floorHeat) {
+      // Room only has floor heat, treat it as the main
+      pairs.push({
+        roomId,
+        roomName,
+        mainThermostat: floorHeat,
+        floorHeat: null,
+      });
+    }
+  }
+  
+  return pairs;
+}
+
+// Coordinated mode change for room thermostats (syncs main + floor heat)
+export async function setRoomThermostatMode(
+  mainThermostatId: string, 
+  floorHeatId: string | null, 
+  mode: ThermostatMode
+): Promise<boolean> {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const { updateThermostat } = useDeviceStore.getState();
+  
+  // Determine floor heat mode based on main thermostat mode
+  // Floor heat only supports heat or off
+  const floorHeatMode: ThermostatMode = mode === 'heat' ? 'heat' : 'off';
+  
+  // Optimistic updates
+  updateThermostat(mainThermostatId, { mode });
+  if (floorHeatId) {
+    updateThermostat(floorHeatId, { mode: floorHeatMode });
+  }
+  
+  try {
+    // Send mode change to main thermostat
+    const mainResponse = await fetch("/api/crestron/thermostats", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: mainThermostatId, action: "mode", mode }),
+    });
+    const mainData = await mainResponse.json();
+    
+    // If we have a floor heat, sync its mode
+    if (floorHeatId) {
+      const floorResponse = await fetch("/api/crestron/thermostats", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: floorHeatId, action: "mode", mode: floorHeatMode }),
+      });
+      const floorData = await floorResponse.json();
+      
+      return mainData.success && floorData.success;
+    }
+    
+    return mainData.success;
+  } catch {
+    return false;
+  }
+}
+
+// Set floor heat mode when user toggles it directly
+export async function setFloorHeatMode(
+  floorHeatId: string,
+  mainThermostatId: string | null,
+  mode: ThermostatMode
+): Promise<boolean> {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const { updateThermostat } = useDeviceStore.getState();
+  
+  // Floor heat only supports heat or off
+  const effectiveMode: ThermostatMode = mode === 'heat' ? 'heat' : 'off';
+  
+  // Optimistic update for floor heat
+  updateThermostat(floorHeatId, { mode: effectiveMode });
+  
+  // If floor heat is turned to heat, main thermostat should also be heat
+  if (effectiveMode === 'heat' && mainThermostatId) {
+    updateThermostat(mainThermostatId, { mode: 'heat' });
+  }
+  
+  try {
+    // Send mode change to floor heat
+    const floorResponse = await fetch("/api/crestron/thermostats", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: floorHeatId, action: "mode", mode: effectiveMode }),
+    });
+    const floorData = await floorResponse.json();
+    
+    // If floor heat is set to heat, also set main thermostat to heat
+    if (effectiveMode === 'heat' && mainThermostatId) {
+      const mainResponse = await fetch("/api/crestron/thermostats", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: mainThermostatId, action: "mode", mode: 'heat' }),
+      });
+      const mainData = await mainResponse.json();
+      
+      return floorData.success && mainData.success;
+    }
+    
+    return floorData.success;
+  } catch {
+    return false;
+  }
+}
+
+// Set temperature for all thermostats
+export async function setAllThermostatsTemp(temperature: number): Promise<boolean> {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const { thermostats, updateThermostat } = useDeviceStore.getState();
+  
+  // Optimistic update all thermostats
+  for (const thermostat of thermostats) {
+    updateThermostat(thermostat.id, { 
+      heatSetPoint: temperature, 
+      coolSetPoint: temperature 
+    });
+  }
+  
+  try {
+    // Send setpoint to all thermostats in parallel
+    const results = await Promise.all(
+      thermostats.map(async (thermostat) => {
+        const response = await fetch("/api/crestron/thermostats", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            id: thermostat.id, 
+            action: "setPoint", 
+            heatSetPoint: temperature, 
+            coolSetPoint: temperature 
+          }),
+        });
+        const data = await response.json();
+        return data.success;
+      })
+    );
+    
+    return results.every(Boolean);
+  } catch {
+    return false;
+  }
+}
+
+// Check temperature satisfaction and turn off floor heat if needed
+export async function checkTemperatureSatisfaction(): Promise<void> {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const pairs = getThermostatPairs();
+  
+  for (const pair of pairs) {
+    // Only check if we have both a main thermostat and floor heat
+    if (!pair.floorHeat) continue;
+    
+    // Only act if main thermostat is in heat mode and floor heat is on
+    if (pair.mainThermostat.mode !== 'heat') continue;
+    if (pair.floorHeat.mode !== 'heat') continue;
+    
+    // Check if main thermostat's temperature is satisfied
+    if (isTemperatureSatisfied(pair.mainThermostat)) {
+      // Turn off floor heat
+      const { updateThermostat } = useDeviceStore.getState();
+      updateThermostat(pair.floorHeat.id, { mode: 'off' });
+      
+      try {
+        await fetch("/api/crestron/thermostats", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ id: pair.floorHeat.id, action: "mode", mode: "off" }),
+        });
+      } catch {
+        // Silently fail - will retry on next poll
+      }
+    }
   }
 }
 

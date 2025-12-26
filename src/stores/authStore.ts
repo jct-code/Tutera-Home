@@ -151,7 +151,7 @@ export async function refreshAuth(): Promise<boolean> {
     const data = await response.json();
 
     if (data.success && data.authKey) {
-      setConnection(processorIp, data.authKey, authToken, authTokenFromEnv);
+      setConnection(processorIp, data.authKey, authToken ?? undefined, authTokenFromEnv);
       return true;
     }
 

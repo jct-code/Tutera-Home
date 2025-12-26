@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
-import { fetchAllData, useDeviceStore } from "@/stores/deviceStore";
+import { fetchAllData, useDeviceStore, checkTemperatureSatisfaction } from "@/stores/deviceStore";
 
 // Default to 10 seconds if env var not set
 const REFRESH_INTERVAL = parseInt(
@@ -76,9 +76,13 @@ export function DataProvider({ children }: DataProviderProps) {
     }
 
     // Set up polling interval
-    intervalRef.current = setInterval(() => {
+    intervalRef.current = setInterval(async () => {
       // fetchAllData already checks isLoading internally
-      fetchAllData();
+      await fetchAllData();
+      
+      // After fetching new data, check if any floor heats should be turned off
+      // based on temperature satisfaction
+      await checkTemperatureSatisfaction();
     }, REFRESH_INTERVAL);
 
     // Cleanup on unmount or when connection changes
