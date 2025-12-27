@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Thermometer, RefreshCw, Droplets } from "lucide-react";
+import { Thermometer, RefreshCw, Droplets, CloudSun } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { ThermostatRoomGroup } from "@/components/devices/ThermostatRoomGroup";
@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/Card";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { useAuthStore } from "@/stores/authStore";
 import { useDeviceStore, fetchAllData, getThermostatPairs } from "@/stores/deviceStore";
+import { useWeatherStore, fetchWeather } from "@/stores/weatherStore";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -31,6 +32,7 @@ export default function ClimatePage() {
   const router = useRouter();
   const { isConnected } = useAuthStore();
   const { thermostats, sensors, isLoading } = useDeviceStore();
+  const { outsideTemp } = useWeatherStore();
 
   // Get thermostat pairs grouped by room
   const thermostatPairs = useMemo(() => getThermostatPairs(), [thermostats]);
@@ -45,6 +47,11 @@ export default function ClimatePage() {
       router.push("/login");
     }
   }, [isConnected, router]);
+
+  // Fetch weather on mount
+  useEffect(() => {
+    fetchWeather();
+  }, []);
 
   if (!isConnected) return null;
 
@@ -95,9 +102,23 @@ export default function ClimatePage() {
             </motion.div>
           )}
 
-          {/* Humidity Stats (if available) */}
-          {avgHumidity !== null && (
-            <motion.div variants={itemVariants}>
+          {/* Outside Temperature & Humidity Stats */}
+          <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Outside Temperature */}
+            <Card padding="md" className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                <CloudSun className="w-6 h-6 text-sky-500" />
+              </div>
+              <div>
+                <p className="text-3xl font-semibold">
+                  {outsideTemp !== null ? `${outsideTemp}°` : "--°"}
+                </p>
+                <p className="text-sm text-[var(--text-secondary)]">Outside Temperature</p>
+              </div>
+            </Card>
+
+            {/* Humidity Stats (if available) */}
+            {avgHumidity !== null && (
               <Card padding="md" className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center">
                   <Droplets className="w-6 h-6 text-cyan-500" />
@@ -107,8 +128,8 @@ export default function ClimatePage() {
                   <p className="text-sm text-[var(--text-secondary)]">Average Humidity</p>
                 </div>
               </Card>
-            </motion.div>
-          )}
+            )}
+          </motion.div>
 
           {/* Thermostats by Room */}
           {thermostatPairs.length > 0 ? (

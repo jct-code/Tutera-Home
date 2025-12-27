@@ -19,10 +19,19 @@ export type DeviceType =
   | "mediaroom"
   | "scene";
 
+// Area (Crestron grouping of rooms by level/zone - e.g., "1st Floor", "Master Suite", "Exterior")
+export interface Area {
+  id: string;
+  name: string;
+  roomIds: string[];   // Room IDs belonging to this area
+}
+
 // Room
 export interface Room {
   id: string;
   name: string;
+  areaId?: string;     // Area this room belongs to (from Crestron)
+  areaName?: string;   // Area name for display
 }
 
 // Merged Room (virtual room combining multiple physical rooms)
@@ -107,6 +116,41 @@ export function isFloorHeat(thermostat: Thermostat): boolean {
   return thermostat.name.toLowerCase().includes('floor heat');
 }
 
+// Equipment control keywords - these are "lights" in the Crestron system but are actually
+// controls for equipment that should be managed separately from actual lighting
+const EQUIPMENT_KEYWORDS = ['fan', 'fans', 'heater', 'pump', 'fountain', 'fire pit'];
+
+// Helper to detect if a light is actually an equipment control
+export function isEquipmentControl(light: Light): boolean {
+  const lowercaseName = light.name.toLowerCase();
+  
+  // If name contains "light" or "lights", it's a light fixture, not equipment
+  // This handles cases like "Fan Light", "Spa Light", "Pool Light"
+  if (lowercaseName.includes('light')) {
+    return false;
+  }
+  
+  // Check for equipment keywords as whole words
+  const words = lowercaseName.split(/[\s\-_]+/);
+  return words.some(word => EQUIPMENT_KEYWORDS.includes(word));
+}
+
+// Helper to filter lights vs equipment controls
+export function separateLightsAndEquipment(lights: Light[]): { actualLights: Light[]; equipment: Light[] } {
+  const actualLights: Light[] = [];
+  const equipment: Light[] = [];
+  
+  lights.forEach(light => {
+    if (isEquipmentControl(light)) {
+      equipment.push(light);
+    } else {
+      actualLights.push(light);
+    }
+  });
+  
+  return { actualLights, equipment };
+}
+
 // Helper to check if room temperature is satisfied (target reached)
 export function isTemperatureSatisfied(thermostat: Thermostat): boolean {
   if (thermostat.mode === 'heat') {
@@ -166,6 +210,10 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+export interface AreasResponse {
+  areas: Area[];
 }
 
 export interface RoomsResponse {

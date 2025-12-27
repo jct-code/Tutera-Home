@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Lightbulb, AlertCircle } from "lucide-react"
 import { Card } from "@/components/ui/Card";
 import { LightCard, LightGroupControl, levelToPercent, percentToLevel } from "./LightCard";
 import type { Light, Room } from "@/lib/crestron/types";
+import { isEquipmentControl } from "@/lib/crestron/types";
 import { setLightState } from "@/stores/deviceStore";
 
 interface LightsByRoomProps {
@@ -216,11 +217,17 @@ export function LightsByRoom({
     return map;
   }, [rooms]);
 
+  // Filter out equipment controls (Fan, Fountain, Heater, etc.) - these are handled separately
+  const actualLights = useMemo(() => 
+    lights.filter(light => !isEquipmentControl(light)), 
+    [lights]
+  );
+
   // Group lights by room
   const groupedLights = useMemo(() => {
     const groups = new Map<string | undefined, Light[]>();
     
-    lights.forEach(light => {
+    actualLights.forEach(light => {
       const roomId = light.roomId;
       if (!groups.has(roomId)) {
         groups.set(roomId, []);
@@ -248,23 +255,23 @@ export function LightsByRoom({
     });
 
     return result;
-  }, [lights, roomMap]);
+  }, [actualLights, roomMap]);
 
-  // Calculate statistics
+  // Calculate statistics (using actualLights, excluding equipment)
   const stats = useMemo(() => {
-    const assignedLights = lights.filter(l => l.roomId).length;
-    const unassignedLights = lights.length - assignedLights;
-    const lightsOn = lights.filter(l => l.isOn || l.level > 0).length;
-    const roomsWithLights = new Set(lights.filter(l => l.roomId).map(l => l.roomId)).size;
+    const assignedLights = actualLights.filter(l => l.roomId).length;
+    const unassignedLights = actualLights.length - assignedLights;
+    const lightsOn = actualLights.filter(l => l.isOn || l.level > 0).length;
+    const roomsWithLights = new Set(actualLights.filter(l => l.roomId).map(l => l.roomId)).size;
     
     return {
-      total: lights.length,
+      total: actualLights.length,
       assigned: assignedLights,
       unassigned: unassignedLights,
       lightsOn,
       roomsWithLights,
     };
-  }, [lights]);
+  }, [actualLights]);
 
   const toggleRoom = (roomId: string) => {
     const newExpanded = new Set(expandedRooms);
@@ -297,7 +304,7 @@ export function LightsByRoom({
               </p>
             </div>
           </div>
-          <LightGroupControl lights={lights} standalone={false} />
+          <LightGroupControl lights={actualLights} standalone={false} />
         </div>
       </Card>
 
@@ -338,9 +345,9 @@ export function LightsByRoom({
                 isWarning={!group.roomId}
               />
 
-              {/* Lights in Room */}
+              {/* Lights in Room - only show when expanded */}
               <AnimatePresence>
-                {(isExpanded || group.lights.length <= maxLightsPerRoom) && (
+                {isExpanded && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
@@ -358,8 +365,8 @@ export function LightsByRoom({
                 )}
               </AnimatePresence>
 
-              {/* Show More Button */}
-              {hasMore && (
+              {/* Show More Button - only when expanded and has more lights */}
+              {isExpanded && hasMore && (
                 <button
                   onClick={() => toggleRoom(roomKey)}
                   className="w-full py-2 text-sm text-[var(--accent)] hover:underline"

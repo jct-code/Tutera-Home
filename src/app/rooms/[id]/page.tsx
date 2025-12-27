@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, RefreshCw, Lightbulb, Blinds, Layers } from "lucide-react";
+import { ArrowLeft, RefreshCw, Lightbulb, Blinds, Layers, Power } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
@@ -11,7 +11,9 @@ import { LightCard, LightGroupControl } from "@/components/devices/LightCard";
 import { ShadeCard } from "@/components/devices/ShadeCard";
 import { ThermostatCard } from "@/components/devices/ThermostatCard";
 import { SensorCard } from "@/components/devices/SensorCard";
+import { EquipmentCard } from "@/components/devices/EquipmentCard";
 import { Button } from "@/components/ui/Button";
+import { separateLightsAndEquipment } from "@/lib/crestron/types";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { useAuthStore } from "@/stores/authStore";
 import { useDeviceStore, fetchAllData } from "@/stores/deviceStore";
@@ -53,10 +55,16 @@ export default function RoomPage() {
     : [roomId];
   
   // Filter devices by room(s)
-  const roomLights = lights.filter(l => l.roomId && targetRoomIds.includes(l.roomId));
+  const allRoomLights = lights.filter(l => l.roomId && targetRoomIds.includes(l.roomId));
   const roomShades = shades.filter(s => s.roomId && targetRoomIds.includes(s.roomId));
   const roomThermostats = thermostats.filter(t => t.roomId && targetRoomIds.includes(t.roomId));
   const roomSensors = sensors.filter(s => s.roomId && targetRoomIds.includes(s.roomId));
+
+  // Separate actual lights from equipment controls (Fan, Fountain, Heater, etc.)
+  const { actualLights: roomLights, equipment: roomEquipment } = useMemo(
+    () => separateLightsAndEquipment(allRoomLights),
+    [allRoomLights]
+  );
   
   // Get source room names for display (for merged rooms)
   const sourceRoomNames = isMergedRoom && mergedRoom
@@ -65,6 +73,40 @@ export default function RoomPage() {
         .filter(Boolean)
         .join(" + ")
     : null;
+
+  // Create room ID to name lookup for merged room views
+  const roomNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    rooms.forEach(room => map.set(room.id, room.name));
+    return map;
+  }, [rooms]);
+
+  // Helper to get room name by ID
+  const getRoomName = (roomId: string | undefined) => roomId ? roomNameMap.get(roomId) : undefined;
+
+  // Group devices by source room for merged views
+  const devicesByRoom = useMemo(() => {
+    if (!isMergedRoom || !mergedRoom) return null;
+
+    // Get unique room IDs from all devices
+    const roomIds = new Set<string>();
+    [...roomLights, ...roomEquipment, ...roomShades, ...roomThermostats, ...roomSensors].forEach(device => {
+      if (device.roomId) roomIds.add(device.roomId);
+    });
+
+    // Create groups
+    return Array.from(roomIds)
+      .map(roomId => ({
+        roomId,
+        roomName: roomNameMap.get(roomId) || roomId,
+        lights: roomLights.filter(l => l.roomId === roomId),
+        equipment: roomEquipment.filter(e => e.roomId === roomId),
+        shades: roomShades.filter(s => s.roomId === roomId),
+        thermostats: roomThermostats.filter(t => t.roomId === roomId),
+        sensors: roomSensors.filter(s => s.roomId === roomId),
+      }))
+      .sort((a, b) => a.roomName.localeCompare(b.roomName));
+  }, [isMergedRoom, mergedRoom, roomLights, roomEquipment, roomShades, roomThermostats, roomSensors, roomNameMap]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -80,7 +122,7 @@ export default function RoomPage() {
 
   if (!isConnected) return null;
 
-  const totalDevices = roomLights.length + roomShades.length + roomThermostats.length + roomSensors.length;
+  const totalDevices = roomLights.length + roomEquipment.length + roomShades.length + roomThermostats.length + roomSensors.length;
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-20 md:pb-6">
@@ -127,77 +169,196 @@ export default function RoomPage() {
           animate="show"
           className="space-y-8"
         >
-          {/* Lights */}
-          {roomLights.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <Lightbulb className="w-5 h-5 text-[var(--light-color)]" />
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                  Lights
-                </h2>
-              </div>
-              <div className="space-y-3">
-                <LightGroupControl lights={roomLights} roomName={room?.name} />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {roomLights.map((light) => (
-                    <motion.div key={light.id} variants={itemVariants}>
-                      <LightCard light={light} roomName={room?.name} />
-                    </motion.div>
-                  ))}
+          {/* Merged Room: Show devices grouped by source room */}
+          {isMergedRoom && devicesByRoom ? (
+            devicesByRoom.map((group) => (
+              <section key={group.roomId} className="space-y-6">
+                {/* Room Header */}
+                <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-light)]">
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                    {group.roomName}
+                  </h2>
+                  <span className="text-sm text-[var(--text-tertiary)]">
+                    {group.lights.length + group.equipment.length + group.shades.length + group.thermostats.length + group.sensors.length} devices
+                  </span>
                 </div>
-              </div>
-            </section>
-          )}
 
-          {/* Shades */}
-          {roomShades.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <Blinds className="w-5 h-5 text-[var(--shade-color)]" />
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                  Shades
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {roomShades.map((shade) => (
-                  <motion.div key={shade.id} variants={itemVariants}>
-                    <ShadeCard shade={shade} />
-                  </motion.div>
-                ))}
-              </div>
-            </section>
-          )}
+                {/* Lights in this room */}
+                {group.lights.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-[var(--light-color)]" />
+                      <h3 className="text-sm font-medium text-[var(--text-secondary)]">Lights</h3>
+                    </div>
+                    <LightGroupControl lights={group.lights} roomName={group.roomName} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pl-2">
+                      {group.lights.map((light) => (
+                        <motion.div key={light.id} variants={itemVariants}>
+                          <LightCard light={light} compact />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-          {/* Thermostats */}
-          {roomThermostats.length > 0 && (
-            <section>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-                Climate Control
-              </h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {roomThermostats.map((thermostat) => (
-                  <motion.div key={thermostat.id} variants={itemVariants}>
-                    <ThermostatCard thermostat={thermostat} />
-                  </motion.div>
-                ))}
-              </div>
-            </section>
-          )}
+                {/* Equipment in this room */}
+                {group.equipment.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Power className="w-4 h-4 text-[var(--accent)]" />
+                      <h3 className="text-sm font-medium text-[var(--text-secondary)]">Equipment</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pl-2">
+                      {group.equipment.map((equip) => (
+                        <motion.div key={equip.id} variants={itemVariants}>
+                          <EquipmentCard equipment={equip} compact />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-          {/* Sensors */}
-          {roomSensors.length > 0 && (
-            <section>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-                Sensors
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {roomSensors.map((sensor) => (
-                  <motion.div key={sensor.id} variants={itemVariants}>
-                    <SensorCard sensor={sensor} />
-                  </motion.div>
-                ))}
-              </div>
-            </section>
+                {/* Shades in this room */}
+                {group.shades.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Blinds className="w-4 h-4 text-[var(--shade-color)]" />
+                      <h3 className="text-sm font-medium text-[var(--text-secondary)]">Shades</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pl-2">
+                      {group.shades.map((shade) => (
+                        <motion.div key={shade.id} variants={itemVariants}>
+                          <ShadeCard shade={shade} compact />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Thermostats in this room */}
+                {group.thermostats.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-[var(--text-secondary)]">Climate Control</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pl-2">
+                      {group.thermostats.map((thermostat) => (
+                        <motion.div key={thermostat.id} variants={itemVariants}>
+                          <ThermostatCard thermostat={thermostat} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sensors in this room */}
+                {group.sensors.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-[var(--text-secondary)]">Sensors</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pl-2">
+                      {group.sensors.map((sensor) => (
+                        <motion.div key={sensor.id} variants={itemVariants}>
+                          <SensorCard sensor={sensor} compact />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            ))
+          ) : (
+            /* Regular Room: Show devices by type */
+            <>
+              {/* Lights */}
+              {roomLights.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Lightbulb className="w-5 h-5 text-[var(--light-color)]" />
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Lights
+                    </h2>
+                  </div>
+                  <div className="space-y-3">
+                    <LightGroupControl lights={roomLights} roomName={room?.name} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {roomLights.map((light) => (
+                        <motion.div key={light.id} variants={itemVariants}>
+                          <LightCard light={light} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* Equipment (Fan, Fountain, Heater, etc.) */}
+              {roomEquipment.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Power className="w-5 h-5 text-[var(--accent)]" />
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Equipment
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {roomEquipment.map((equip) => (
+                      <motion.div key={equip.id} variants={itemVariants}>
+                        <EquipmentCard equipment={equip} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Shades */}
+              {roomShades.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Blinds className="w-5 h-5 text-[var(--shade-color)]" />
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Shades
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {roomShades.map((shade) => (
+                      <motion.div key={shade.id} variants={itemVariants}>
+                        <ShadeCard shade={shade} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Thermostats */}
+              {roomThermostats.length > 0 && (
+                <section>
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
+                    Climate Control
+                  </h2>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {roomThermostats.map((thermostat) => (
+                      <motion.div key={thermostat.id} variants={itemVariants}>
+                        <ThermostatCard thermostat={thermostat} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Sensors */}
+              {roomSensors.length > 0 && (
+                <section>
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
+                    Sensors
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {roomSensors.map((sensor) => (
+                      <motion.div key={sensor.id} variants={itemVariants}>
+                        <SensorCard sensor={sensor} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
           )}
 
           {/* Empty State */}

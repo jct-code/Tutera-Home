@@ -5,6 +5,10 @@ export const CRESTRON_ENDPOINTS = {
   LOGIN: "/cws/api/login",
   LOGOUT: "/cws/api/logout",
   
+  // Areas (groupings of rooms by level/zone)
+  AREAS: "/cws/api/areas",
+  AREA: (id: string) => `/cws/api/areas/${id}`,
+  
   // Rooms
   ROOMS: "/cws/api/rooms",
   ROOM: (id: string) => `/cws/api/rooms/${id}`,

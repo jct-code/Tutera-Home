@@ -9,6 +9,7 @@ if (typeof window === 'undefined') {
 }
 import type {
   ApiResponse,
+  Area,
   Room,
   Light,
   Shade,
@@ -105,6 +106,15 @@ export class CrestronClient {
 
   async logout(): Promise<ApiResponse<void>> {
     return this.request<void>(CRESTRON_ENDPOINTS.LOGOUT, { method: "POST" });
+  }
+
+  // Areas (groupings of rooms by level/zone)
+  async getAreas(): Promise<ApiResponse<Area[]>> {
+    return this.request<Area[]>(CRESTRON_ENDPOINTS.AREAS);
+  }
+
+  async getArea(id: string): Promise<ApiResponse<Area>> {
+    return this.request<Area>(CRESTRON_ENDPOINTS.AREA(id));
   }
 
   // Rooms

@@ -12,6 +12,34 @@ function getClientConfig(request: NextRequest) {
   return { processorIp, authKey };
 }
 
+// Crestron Room structure from API
+interface CrestronRoom {
+  id: number;
+  name: string;
+  areaId?: number;
+  areaName?: string;
+}
+
+// Helper to extract array from potentially nested Crestron response
+function extractRooms(data: unknown): CrestronRoom[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object' && data !== null && 'rooms' in data) {
+    return (data as { rooms: CrestronRoom[] }).rooms || [];
+  }
+  return [];
+}
+
+// Transform Crestron room to our interface format
+function transformRoom(room: CrestronRoom) {
+  return {
+    id: String(room.id),
+    name: room.name,
+    areaId: room.areaId ? String(room.areaId) : undefined,
+    areaName: room.areaName,
+  };
+}
+
 // GET - Get all rooms
 export async function GET(request: NextRequest) {
   const config = getClientConfig(request);
@@ -27,7 +55,13 @@ export async function GET(request: NextRequest) {
   const result = await client.getRooms();
 
   if (result.success) {
-    return NextResponse.json(result);
+    const roomsArray = extractRooms(result.data);
+    const transformedRooms = roomsArray.map(transformRoom);
+    
+    return NextResponse.json({
+      success: true,
+      data: transformedRooms,
+    });
   }
 
   return NextResponse.json(result, { status: 500 });

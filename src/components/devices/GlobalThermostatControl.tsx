@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Thermometer,
-  ChevronUp,
-  ChevronDown,
   Minus,
   Plus,
+  Flame,
+  Snowflake,
+  CloudSun,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import type { Thermostat } from "@/lib/crestron/types";
 import { setAllThermostatsTemp } from "@/stores/deviceStore";
+import { useWeatherStore, fetchWeather, determineMode, getModeRecommendation } from "@/stores/weatherStore";
 
 interface GlobalThermostatControlProps {
   thermostats: Thermostat[];
@@ -18,6 +20,12 @@ interface GlobalThermostatControlProps {
 
 export function GlobalThermostatControl({ thermostats }: GlobalThermostatControlProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const { outsideTemp, isLoading: weatherLoading } = useWeatherStore();
+  
+  // Fetch weather on mount
+  useEffect(() => {
+    fetchWeather();
+  }, []);
   
   // Calculate average current temperature and setpoint
   const { avgCurrentTemp, avgSetPoint, activeCount } = useMemo(() => {
@@ -45,6 +53,18 @@ export function GlobalThermostatControl({ thermostats }: GlobalThermostatControl
 
   const [targetTemp, setTargetTemp] = useState(avgSetPoint);
 
+  // Determine recommended mode based on outside temperature
+  const recommendedMode = useMemo(() => {
+    if (outsideTemp === null) return null;
+    return determineMode(outsideTemp, targetTemp);
+  }, [outsideTemp, targetTemp]);
+
+  // Get mode recommendation text
+  const modeRecommendationText = useMemo(() => {
+    if (outsideTemp === null) return null;
+    return getModeRecommendation(outsideTemp, targetTemp);
+  }, [outsideTemp, targetTemp]);
+
   // Track if local target differs from average (user is adjusting)
   const hasUnsavedChanges = targetTemp !== avgSetPoint;
 
@@ -58,13 +78,14 @@ export function GlobalThermostatControl({ thermostats }: GlobalThermostatControl
 
   const handleApplyToAll = useCallback(async () => {
     setIsUpdating(true);
-    const success = await setAllThermostatsTemp(targetTemp);
+    // Apply with the recommended mode (turns on off thermostats)
+    const success = await setAllThermostatsTemp(targetTemp, recommendedMode ?? undefined);
     if (!success) {
       // Reset to average on failure
       setTargetTemp(avgSetPoint);
     }
     setIsUpdating(false);
-  }, [targetTemp, avgSetPoint]);
+  }, [targetTemp, avgSetPoint, recommendedMode]);
 
   const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTargetTemp(parseInt(e.target.value, 10));
@@ -79,6 +100,10 @@ export function GlobalThermostatControl({ thermostats }: GlobalThermostatControl
   };
 
   const tempColor = getTempColor(targetTemp);
+  
+  // Mode icon and color
+  const ModeIcon = recommendedMode === "heat" ? Flame : recommendedMode === "cool" ? Snowflake : CloudSun;
+  const modeColor = recommendedMode === "heat" ? "#EF4444" : recommendedMode === "cool" ? "#3B82F6" : "#10B981";
 
   return (
     <Card padding="lg" className="bg-gradient-to-br from-[var(--climate-color)]/10 to-[var(--climate-color)]/5 border-[var(--climate-color)]/20">
@@ -103,8 +128,39 @@ export function GlobalThermostatControl({ thermostats }: GlobalThermostatControl
           <p className="text-4xl font-light text-[var(--text-primary)]">
             {avgCurrentTemp}°
           </p>
-          <p className="text-xs text-[var(--text-tertiary)]">Avg Current</p>
+          <p className="text-xs text-[var(--text-tertiary)]">Avg Inside</p>
         </div>
+      </div>
+
+      {/* Outside Temperature & Mode Recommendation */}
+      <div className="flex items-center justify-between mb-4 p-3 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${modeColor}20` }}
+          >
+            <CloudSun className="w-5 h-5" style={{ color: modeColor }} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {outsideTemp !== null ? `${outsideTemp}°F Outside` : weatherLoading ? "Loading..." : "Weather unavailable"}
+            </p>
+            {modeRecommendationText && (
+              <p className="text-xs text-[var(--text-secondary)]">
+                {recommendedMode === "heat" ? "🔥" : "❄️"} {recommendedMode === "heat" ? "Heating" : "Cooling"} recommended
+              </p>
+            )}
+          </div>
+        </div>
+        {recommendedMode && (
+          <div 
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{ backgroundColor: `${modeColor}20`, color: modeColor }}
+          >
+            <ModeIcon className="w-3.5 h-3.5" />
+            {recommendedMode === "heat" ? "Heat" : "Cool"}
+          </div>
+        )}
       </div>
 
       {/* Temperature Slider Section */}
@@ -193,20 +249,24 @@ export function GlobalThermostatControl({ thermostats }: GlobalThermostatControl
             disabled={isUpdating}
             className={`
               w-full py-3 px-4 rounded-xl font-medium text-white
-              transition-all duration-200 shadow-lg
+              transition-all duration-200 shadow-lg flex items-center justify-center gap-2
               ${isUpdating 
                 ? "bg-[var(--text-tertiary)] cursor-not-allowed" 
                 : "bg-[var(--climate-color)] hover:bg-[var(--climate-color)]/90 shadow-[var(--climate-color)]/30"
               }
             `}
+            style={!isUpdating && recommendedMode ? { backgroundColor: modeColor } : undefined}
           >
             {isUpdating ? (
-              <span className="flex items-center justify-center gap-2">
+              <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Updating...
-              </span>
+                Updating all thermostats...
+              </>
             ) : (
-              `Set All to ${targetTemp}°`
+              <>
+                <ModeIcon className="w-4 h-4" />
+                Set All to {targetTemp}° ({recommendedMode === "heat" ? "Heat" : recommendedMode === "cool" ? "Cool" : "Auto"})
+              </>
             )}
           </button>
         )}
@@ -242,5 +302,3 @@ export function GlobalThermostatControl({ thermostats }: GlobalThermostatControl
 }
 
 export default GlobalThermostatControl;
-
-

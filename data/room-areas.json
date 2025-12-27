@@ -1,0 +1,108 @@
+{
+  "areas": [
+    {
+      "id": "master-suite",
+      "name": "Master Suite",
+      "order": 1,
+      "roomNames": [
+        "Master Bedroom",
+        "Master Bathroom",
+        "Joe's Office",
+        "Master Gallery",
+        "Joe’s Office"
+      ]
+    },
+    {
+      "id": "2nd-floor",
+      "name": "2nd Floor",
+      "order": 2,
+      "roomNames": [
+        "Upper Commons",
+        "Hannah's Bedroom",
+        "Laura's Bedroom",
+        "Dominic's Bedroom",
+        "Giorgia's Bedroom",
+        "Hannah’s Bedroom",
+        "Laura’s Bedroom",
+        "Dominic’s Bedroom",
+        "Giorgia’s Bedroom"
+      ]
+    },
+    {
+      "id": "1st-floor",
+      "name": "1st Floor",
+      "order": 3,
+      "roomNames": [
+        "Kitchen",
+        "Hearth",
+        "Grand Stairs Landing",
+        "Garage",
+        "Side Door",
+        "Grand Stairs",
+        "Galleries",
+        "Laundry/Mud Room",
+        "Dining Room",
+        "Music",
+        "Living Room",
+        "Music Room",
+        "Foyer"
+      ]
+    },
+    {
+      "id": "lower-level",
+      "name": "Lower Level",
+      "order": 4,
+      "roomNames": [
+        "Guest Room",
+        "Lower Galleries",
+        "Theater",
+        "Media Room",
+        "Exercise",
+        "Game Room",
+        "Marian's Office - Craft",
+        "Main Storage",
+        "Summer Kitchen",
+        "Rear Stairway",
+        "Sports Court",
+        "Sport Court Stairs"
+      ]
+    },
+    {
+      "id": "exterior",
+      "name": "Exterior",
+      "order": 5,
+      "roomNames": [
+        "Courtyard",
+        "Covered Patio",
+        "Front Porch",
+        "Pergola",
+        "Pool and Spa",
+        "Side Porch",
+        "Landscape Back Yard",
+        "Landscape Front Yard",
+        "Upper Deck",
+        "Pool Deck"
+      ]
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure",
+      "order": 6,
+      "roomNames": [
+        "AV Room",
+        "Cameras",
+        "Floor Heat",
+        "Flood Lights",
+        "House Accents",
+        "Whole House",
+        "Virtual TV"
+      ]
+    },
+    {
+      "id": "exterior-lights",
+      "name": "Exterior Lights",
+      "order": 7,
+      "roomNames": []
+    }
+  ]
+}

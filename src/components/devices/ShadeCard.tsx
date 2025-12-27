@@ -10,10 +10,11 @@ import type { Shade } from "@/lib/crestron/types";
 interface ShadeCardProps {
   shade: Shade;
   compact?: boolean;
+  roomName?: string;
   onPositionChange?: (id: string, position: number) => Promise<void>;
 }
 
-export function ShadeCard({ shade, compact = false, onPositionChange }: ShadeCardProps) {
+export function ShadeCard({ shade, compact = false, roomName, onPositionChange }: ShadeCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const position = shade.position; // 0-100 (0 = closed, 100 = open)
   const isOpen = position > 0;
@@ -60,6 +61,7 @@ export function ShadeCard({ shade, compact = false, onPositionChange }: ShadeCar
                 {shade.name}
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
+                {roomName && <span className="text-[var(--text-tertiary)]">{roomName} · </span>}
                 {position === 0 ? "Closed" : position === 100 ? "Open" : `${position}%`}
               </p>
             </div>
