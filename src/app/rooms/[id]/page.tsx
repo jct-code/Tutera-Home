@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, RefreshCw, Lightbulb, Blinds, Layers, Power } from "lucide-react";
+import { ArrowLeft, RefreshCw, Lightbulb, Blinds, Layers, Power, Music } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
@@ -40,6 +40,7 @@ import { ShadeCard } from "@/components/devices/ShadeCard";
 import { ThermostatCard } from "@/components/devices/ThermostatCard";
 import { SensorCard } from "@/components/devices/SensorCard";
 import { EquipmentCard } from "@/components/devices/EquipmentCard";
+import { MediaRoomCard } from "@/components/devices/MediaRoomCard";
 import { Button } from "@/components/ui/Button";
 import { separateLightsAndEquipment } from "@/lib/crestron/types";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
@@ -65,7 +66,7 @@ export default function RoomPage() {
   const roomId = params.id as string;
   
   const { isConnected } = useAuthStore();
-  const { rooms, virtualRooms, lights, shades, thermostats, sensors, isLoading } = useDeviceStore();
+  const { rooms, virtualRooms, lights, shades, thermostats, sensors, mediaRooms, isLoading } = useDeviceStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Check if this is a virtual room
@@ -87,6 +88,7 @@ export default function RoomPage() {
   const roomShades = shades.filter(s => s.roomId && targetRoomIds.includes(s.roomId));
   const roomThermostats = thermostats.filter(t => t.roomId && targetRoomIds.includes(t.roomId));
   const roomSensors = sensors.filter(s => s.roomId && targetRoomIds.includes(s.roomId));
+  const roomMediaRooms = mediaRooms.filter(m => m.roomId && targetRoomIds.includes(m.roomId));
 
   // Separate actual lights from equipment controls (Fan, Fountain, Heater, etc.)
   const { actualLights: roomLights, equipment: roomEquipment } = useMemo(
@@ -183,7 +185,7 @@ export default function RoomPage() {
 
     // Get unique room IDs from all devices
     const roomIds = new Set<string>();
-    [...roomLights, ...roomEquipment, ...roomShades, ...roomThermostats, ...roomSensors].forEach(device => {
+    [...roomLights, ...roomEquipment, ...roomShades, ...roomThermostats, ...roomSensors, ...roomMediaRooms].forEach(device => {
       if (device.roomId) roomIds.add(device.roomId);
     });
 
@@ -197,9 +199,10 @@ export default function RoomPage() {
         shades: roomShades.filter(s => s.roomId === roomId),
         thermostats: roomThermostats.filter(t => t.roomId === roomId),
         sensors: roomSensors.filter(s => s.roomId === roomId),
+        mediaRooms: roomMediaRooms.filter(m => m.roomId === roomId),
       }))
       .sort((a, b) => a.roomName.localeCompare(b.roomName));
-  }, [isVirtualRoom, virtualRoom, roomLights, roomEquipment, roomShades, roomThermostats, roomSensors, roomNameMap]);
+  }, [isVirtualRoom, virtualRoom, roomLights, roomEquipment, roomShades, roomThermostats, roomSensors, roomMediaRooms, roomNameMap]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -215,7 +218,7 @@ export default function RoomPage() {
 
   if (!isConnected) return null;
 
-  const totalDevices = roomLights.length + roomEquipment.length + roomShades.length + roomThermostats.length + roomSensors.length;
+  const totalDevices = roomLights.length + roomEquipment.length + roomShades.length + roomThermostats.length + roomSensors.length + roomMediaRooms.length;
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-20 md:pb-6">
@@ -272,7 +275,7 @@ export default function RoomPage() {
                     {group.roomName}
                   </h2>
                   <span className="text-sm text-[var(--text-tertiary)]">
-                    {group.lights.length + group.equipment.length + group.shades.length + group.thermostats.length + group.sensors.length} devices
+                    {group.lights.length + group.equipment.length + group.shades.length + group.thermostats.length + group.sensors.length + group.mediaRooms.length} devices
                   </span>
                 </div>
 
@@ -350,6 +353,23 @@ export default function RoomPage() {
                       {group.sensors.map((sensor) => (
                         <motion.div key={sensor.id} variants={itemVariants}>
                           <SensorCard sensor={sensor} compact />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Media Rooms in this room */}
+                {group.mediaRooms.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Music className="w-4 h-4 text-purple-500" />
+                      <h3 className="text-sm font-medium text-[var(--text-secondary)]">Audio</h3>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pl-2">
+                      {group.mediaRooms.map((mediaRoom) => (
+                        <motion.div key={mediaRoom.id} variants={itemVariants}>
+                          <MediaRoomCard mediaRoom={mediaRoom} roomName={group.roomName} />
                         </motion.div>
                       ))}
                     </div>
@@ -502,6 +522,25 @@ export default function RoomPage() {
                     {roomSensors.map((sensor) => (
                       <motion.div key={sensor.id} variants={itemVariants}>
                         <SensorCard sensor={sensor} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Media / Audio */}
+              {roomMediaRooms.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Music className="w-5 h-5 text-purple-500" />
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Audio
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {roomMediaRooms.map((mediaRoom) => (
+                      <motion.div key={mediaRoom.id} variants={itemVariants}>
+                        <MediaRoomCard mediaRoom={mediaRoom} roomName={room?.name} />
                       </motion.div>
                     ))}
                   </div>

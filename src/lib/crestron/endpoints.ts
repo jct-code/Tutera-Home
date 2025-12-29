@@ -54,6 +54,11 @@ export const CRESTRON_ENDPOINTS = {
   // Media Rooms
   MEDIA_ROOMS: "/cws/api/mediarooms",
   MEDIA_ROOM: (id: string) => `/cws/api/mediarooms/${id}`,
+  MEDIA_ROOM_MUTE: (id: string) => `/cws/api/mediarooms/${id}/mute`,
+  MEDIA_ROOM_UNMUTE: (id: string) => `/cws/api/mediarooms/${id}/unmute`,
+  MEDIA_ROOM_VOLUME: (id: string, level: number) => `/cws/api/mediarooms/${id}/volume/${level}`,
+  MEDIA_ROOM_POWER: (id: string, state: "on" | "off") => `/cws/api/mediarooms/${id}/power/${state}`,
+  MEDIA_ROOM_SELECT_SOURCE: (id: string, sourceId: number) => `/cws/api/mediarooms/${id}/selectsource/${sourceId}`,
   
   // Quick Actions
   QUICK_ACTIONS: "/cws/api/quickactions",

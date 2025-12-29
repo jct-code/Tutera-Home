@@ -8,7 +8,6 @@ import {
   Home,
   Thermometer,
   Shield,
-  Palette,
   Lightbulb,
   Blinds,
   Layers,
@@ -17,6 +16,7 @@ import {
   Plus,
   X,
   Check,
+  Music,
 } from "lucide-react";
 import type { VirtualRoom, Area } from "@/lib/crestron/types";
 
@@ -24,8 +24,8 @@ const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/climate", label: "Climate", icon: Thermometer },
   { href: "/lighting", label: "Lighting", icon: Lightbulb },
+  { href: "/media", label: "Media", icon: Music },
   { href: "/security", label: "Security", icon: Shield },
-  { href: "/scenes", label: "Scenes", icon: Palette },
 ];
 
 export function BottomNavigation() {

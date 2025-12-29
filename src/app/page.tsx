@@ -14,6 +14,7 @@ import {
   Power,
   Layers,
   Building2,
+  Music,
 } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
@@ -30,6 +31,7 @@ import { SensorSummary } from "@/components/devices/SensorCard";
 import { EquipmentCard } from "@/components/devices/EquipmentCard";
 import { RoomStatusTile } from "@/components/devices/RoomStatusTile";
 import { RoomZoneControl } from "@/components/devices/RoomZoneControl";
+import { MediaRoomCard } from "@/components/devices/MediaRoomCard";
 import { separateLightsAndEquipment } from "@/lib/crestron/types";
 import { QuickActionsBar } from "@/components/layout/QuickActions";
 import { useAuthStore } from "@/stores/authStore";
@@ -65,6 +67,7 @@ export default function Dashboard() {
     thermostats, 
     doorLocks,
     sensors,
+    mediaRooms,
     isLoading,
   } = useDeviceStore();
   
@@ -146,6 +149,7 @@ export default function Dashboard() {
   );
   const lightsOn = allActualLights.filter(l => l.isOn || l.level > 0).length;
   const unlockedDoors = doorLocks.filter(l => !l.isLocked).length;
+  const mediaRoomsPlaying = mediaRooms.filter(m => m.isPoweredOn).length;
 
   // Get rooms with combined lighting and climate status
   const roomsWithStatus = useMemo(() => getRoomsWithStatus(), [lights, thermostats, rooms]);
@@ -371,6 +375,58 @@ export default function Dashboard() {
                   </Link>
                 </div>
                 <SceneGrid scenes={scenes} maxVisible={4} />
+              </motion.section>
+            )}
+
+            {/* Media / Audio */}
+            {mediaRooms.length > 0 && (
+              <motion.section variants={itemVariants}>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                    Audio
+                  </h2>
+                  <Link
+                    href="/media"
+                    className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1"
+                  >
+                    View all <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+                {/* Show playing rooms or first room */}
+                {mediaRoomsPlaying > 0 ? (
+                  <div className="space-y-2">
+                    {mediaRooms
+                      .filter(m => m.isPoweredOn)
+                      .slice(0, 2)
+                      .map((mediaRoom) => (
+                        <MediaRoomCard
+                          key={mediaRoom.id}
+                          mediaRoom={mediaRoom}
+                          roomName={getRoomName(mediaRoom.roomId)}
+                          compact
+                        />
+                      ))
+                    }
+                    {mediaRoomsPlaying > 2 && (
+                      <Link
+                        href="/media"
+                        className="block text-center py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
+                      >
+                        +{mediaRoomsPlaying - 2} more playing
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <Card padding="md" className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                      <Music className="w-5 h-5 text-purple-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-[var(--text-primary)]">{mediaRooms.length} Audio Rooms</p>
+                      <p className="text-sm text-[var(--text-secondary)]">All off</p>
+                    </div>
+                  </Card>
+                )}
               </motion.section>
             )}
 

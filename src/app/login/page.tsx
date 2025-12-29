@@ -37,6 +37,11 @@ export default function LoginPage() {
           router.push("/");
           return;
         }
+        
+        // If auto-connect failed but we have env values, pre-fill the form
+        if (data.envProcessorIp) {
+          setProcessorIp(data.envProcessorIp);
+        }
       } catch (err) {
         // Silently fail - user can connect manually
         console.error("Auto-connect check failed:", err);

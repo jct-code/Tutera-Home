@@ -12,6 +12,7 @@ export async function GET() {
       autoConnectAvailable: false,
       processorIp: null,
       authKey: null,
+      envProcessorIp: processorIp || null, // Return env IP for form pre-fill
     });
   }
 
@@ -38,6 +39,7 @@ export async function GET() {
       autoConnectAvailable: false,
       processorIp: null,
       authKey: null,
+      envProcessorIp: processorIp, // Return env IP for form pre-fill
       error: result.error,
     });
   } catch (error) {
@@ -45,6 +47,7 @@ export async function GET() {
       autoConnectAvailable: false,
       processorIp: null,
       authKey: null,
+      envProcessorIp: processorIp, // Return env IP for form pre-fill
       error: error instanceof Error ? error.message : "Auto-connect failed",
     });
   }

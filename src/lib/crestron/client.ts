@@ -72,6 +72,12 @@ export class CrestronClient {
         headers,
       });
 
+      // HTTP 409 Conflict typically means the resource is already in the requested state
+      // For media room controls, this is a success case (desired state already achieved)
+      if (response.status === 409) {
+        return { success: true, data: undefined };
+      }
+
       if (!response.ok) {
         return {
           success: false,
@@ -223,12 +229,18 @@ export class CrestronClient {
   async setThermostatMode(
     payload: ThermostatModePayload
   ): Promise<ApiResponse<void>> {
-    // Capitalize mode for Crestron API (e.g., "heat" -> "Heat")
-    const capitalizedMode = payload.mode.charAt(0).toUpperCase() + payload.mode.slice(1).toLowerCase();
+    // Convert mode to uppercase for Crestron API (e.g., "off" -> "OFF", "heat" -> "HEAT")
+    // API documentation specifies: mode: "[HEAT/COOL/AUTO/OFF]"
+    const uppercaseMode = payload.mode.toUpperCase();
     
+    // API expects: { "thermostats": [{ "id": [id], "mode": "[HEAT/COOL/AUTO/OFF]" }] }
     const crestronPayload = {
-      id: Number(payload.id),  // Convert string ID to number
-      mode: capitalizedMode,
+      thermostats: [
+        {
+          id: Number(payload.id),  // Convert string ID to number
+          mode: uppercaseMode,
+        }
+      ]
     };
     
     return this.request<void>(CRESTRON_ENDPOINTS.THERMOSTAT_MODE, {
@@ -297,6 +309,33 @@ export class CrestronClient {
 
   async getMediaRoom(id: string): Promise<ApiResponse<MediaRoom>> {
     return this.request<MediaRoom>(CRESTRON_ENDPOINTS.MEDIA_ROOM(id));
+  }
+
+  async setMediaRoomMute(id: string, muted: boolean): Promise<ApiResponse<void>> {
+    const endpoint = muted 
+      ? CRESTRON_ENDPOINTS.MEDIA_ROOM_MUTE(id)
+      : CRESTRON_ENDPOINTS.MEDIA_ROOM_UNMUTE(id);
+    return this.request<void>(endpoint, { method: "POST" });
+  }
+
+  async setMediaRoomVolume(id: string, volumePercent: number): Promise<ApiResponse<void>> {
+    // Clamp volume to 0-100 range
+    const clampedPercent = Math.max(0, Math.min(100, volumePercent));
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_VOLUME(id, clampedPercent), {
+      method: "POST",
+    });
+  }
+
+  async setMediaRoomPower(id: string, powerState: "on" | "off"): Promise<ApiResponse<void>> {
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_POWER(id, powerState), {
+      method: "POST",
+    });
+  }
+
+  async selectMediaRoomSource(id: string, sourceIndex: number): Promise<ApiResponse<void>> {
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_SELECT_SOURCE(id, sourceIndex), {
+      method: "POST",
+    });
   }
 
   // Quick Actions

@@ -185,6 +185,55 @@ function transformDoorLock(d: CrestronDoorLock) {
   };
 }
 
+// Transform Crestron media room to our interface format
+interface CrestronMediaRoom {
+  id: number;
+  name: string;
+  roomId?: number;
+  currentVolumeLevel: number;           // 0-65535 or percentage depending on system
+  currentMuteState: "Muted" | "Unmuted";
+  currentPowerState: "On" | "Off";
+  currentProviderId?: number;
+  availableProviders: string[];
+  availableVolumeControls: string[];    // ["discrete"] or ["none"]
+  availableMuteControls: string[];      // ["discrete"] or ["none"]
+}
+
+function transformMediaRoom(m: CrestronMediaRoom) {
+  // Crestron volume can be 0-65535 (raw) or 0-100 (percent) depending on configuration
+  // If volume is > 100, treat it as raw 0-65535 and convert to percent
+  // Otherwise, assume it's already a percentage
+  const rawVolume = m.currentVolumeLevel ?? 0;
+  const volumePercent = rawVolume > 100 
+    ? Math.round((rawVolume / 65535) * 100) 
+    : rawVolume;
+  
+  // Resolve current source name from provider ID
+  const currentSourceName = m.currentProviderId !== undefined && m.availableProviders?.length > 0
+    ? m.availableProviders[m.currentProviderId] || undefined
+    : undefined;
+  
+  return {
+    id: String(m.id),
+    name: m.name,
+    type: 'mediaroom' as const,
+    roomId: m.roomId ? String(m.roomId) : undefined,
+    // Raw values from Crestron
+    currentVolumeLevel: rawVolume,
+    currentMuteState: m.currentMuteState || "Unmuted",
+    currentPowerState: m.currentPowerState || "Off",
+    currentProviderId: m.currentProviderId,
+    availableProviders: m.availableProviders || [],
+    availableVolumeControls: m.availableVolumeControls || ["none"],
+    availableMuteControls: m.availableMuteControls || ["none"],
+    // Computed values for UI
+    isPoweredOn: m.currentPowerState === "On",
+    isMuted: m.currentMuteState === "Muted",
+    volumePercent,
+    currentSourceName,
+  };
+}
+
 // GET - Get all devices
 export async function GET(request: NextRequest) {
   const config = getClientConfig(request);
@@ -217,7 +266,7 @@ export async function GET(request: NextRequest) {
   const doorLocksArray = extractArray<CrestronDoorLock>(doorLocks.data, 'doorLocks').map(transformDoorLock);
   const sensorsArray = extractArray<CrestronSensor>(sensors.data, 'sensors').map(transformSensor);
   const securityDevicesArray = extractArray(securityDevices.data, 'securityDevices');
-  const mediaRoomsArray = extractArray(mediaRooms.data, 'mediaRooms');
+  const mediaRoomsArray = extractArray<CrestronMediaRoom>(mediaRooms.data, 'mediaRooms').map(transformMediaRoom);
 
   return NextResponse.json({
     success: true,

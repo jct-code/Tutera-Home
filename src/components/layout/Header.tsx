@@ -9,13 +9,13 @@ import {
   Home,
   Thermometer,
   Shield,
-  Palette,
   Lightbulb,
   Menu,
   X,
   LogOut,
   Wifi,
   WifiOff,
+  Music,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { IconButton } from "@/components/ui/Button";
@@ -24,8 +24,8 @@ const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/climate", label: "Climate", icon: Thermometer },
   { href: "/lighting", label: "Lighting", icon: Lightbulb },
+  { href: "/media", label: "Media", icon: Music },
   { href: "/security", label: "Security", icon: Shield },
-  { href: "/scenes", label: "Scenes", icon: Palette },
 ];
 
 export function Header() {

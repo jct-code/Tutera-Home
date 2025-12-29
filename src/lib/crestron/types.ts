@@ -211,12 +211,67 @@ export interface SecurityDevice extends CrestronDevice {
 export type SecurityStatus = "armed" | "armedAway" | "armedStay" | "disarmed" | "alarm";
 
 // Media Room
+export type MediaRoomMuteState = "Muted" | "Unmuted";
+export type MediaRoomPowerState = "On" | "Off";
+export type MediaRoomVolumeControl = "discrete" | "none";
+export type MediaRoomMuteControl = "discrete" | "none";
+
 export interface MediaRoom extends CrestronDevice {
   type: "mediaroom";
-  isPoweredOn: boolean;
-  currentSource?: string;
-  volume?: number;
-  isMuted?: boolean;
+  // Raw values from Crestron API
+  currentVolumeLevel: number;           // 0-65535 raw value
+  currentMuteState: MediaRoomMuteState;
+  currentPowerState: MediaRoomPowerState;
+  currentProviderId?: number;           // Current source ID (index into availableProviders)
+  availableProviders: string[];         // Available audio sources
+  availableVolumeControls: MediaRoomVolumeControl[];
+  availableMuteControls: MediaRoomMuteControl[];
+  // Computed/normalized values for UI
+  isPoweredOn: boolean;                 // Derived from currentPowerState
+  isMuted: boolean;                     // Derived from currentMuteState
+  volumePercent: number;                // 0-100, derived from currentVolumeLevel
+  currentSourceName?: string;           // Resolved source name from currentProviderId
+}
+
+// Media Room Control Payloads
+export interface MediaRoomVolumePayload {
+  id: string;
+  volumePercent: number;  // 0-100
+}
+
+export interface MediaRoomPowerPayload {
+  id: string;
+  powerState: "on" | "off";
+}
+
+export interface MediaRoomMutePayload {
+  id: string;
+  muted: boolean;
+}
+
+export interface MediaRoomSourcePayload {
+  id: string;
+  sourceIndex: number;  // Index into availableProviders array
+}
+
+// Helper to convert raw volume (0-65535) to percent (0-100)
+export function volumeToPercent(rawVolume: number): number {
+  return Math.round((rawVolume / 65535) * 100);
+}
+
+// Helper to convert percent (0-100) to raw volume (0-65535)
+export function percentToVolume(percent: number): number {
+  return Math.round((percent / 100) * 65535);
+}
+
+// Helper to check if media room has volume control
+export function hasVolumeControl(mediaRoom: MediaRoom): boolean {
+  return mediaRoom.availableVolumeControls.includes("discrete");
+}
+
+// Helper to check if media room has mute control
+export function hasMuteControl(mediaRoom: MediaRoom): boolean {
+  return mediaRoom.availableMuteControls.includes("discrete");
 }
 
 // Quick Action

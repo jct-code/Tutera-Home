@@ -67,6 +67,7 @@ interface DeviceState {
   updateLight: (id: string, updates: Partial<Light>) => void;
   updateThermostat: (id: string, updates: Partial<Thermostat>) => void;
   updateDoorLock: (id: string, updates: Partial<DoorLock>) => void;
+  updateMediaRoom: (id: string, updates: Partial<MediaRoom>) => void;
   
   // Clear all data
   clearAll: () => void;
@@ -159,6 +160,13 @@ export const useDeviceStore = create<DeviceState>()(
         set((state) => ({
           doorLocks: state.doorLocks.map((lock) =>
             lock.id === id ? { ...lock, ...updates } : lock
+          ),
+        })),
+
+      updateMediaRoom: (id, updates) =>
+        set((state) => ({
+          mediaRooms: state.mediaRooms.map((mediaRoom) =>
+            mediaRoom.id === id ? { ...mediaRoom, ...updates } : mediaRoom
           ),
         })),
 
@@ -1231,6 +1239,232 @@ export async function setDoorLockState(id: string, isLocked: boolean) {
   } catch {
     return false;
   }
+}
+
+// Media Room control functions
+
+export async function setMediaRoomPower(id: string, powerState: "on" | "off") {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const { updateMediaRoom } = useDeviceStore.getState();
+  
+  // Optimistic update
+  updateMediaRoom(id, { 
+    isPoweredOn: powerState === "on",
+    currentPowerState: powerState === "on" ? "On" : "Off",
+  });
+  
+  try {
+    const response = await fetch("/api/crestron/media", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "power", powerState }),
+    });
+    const data = await response.json();
+    return data.success;
+  } catch {
+    return false;
+  }
+}
+
+export async function setMediaRoomVolume(id: string, volumePercent: number) {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const { updateMediaRoom } = useDeviceStore.getState();
+  
+  // Clamp volume to 0-100
+  const clampedVolume = Math.max(0, Math.min(100, volumePercent));
+  
+  // Optimistic update
+  updateMediaRoom(id, { 
+    volumePercent: clampedVolume,
+    currentVolumeLevel: Math.round((clampedVolume / 100) * 65535),
+  });
+  
+  try {
+    const response = await fetch("/api/crestron/media", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "volume", volumePercent: clampedVolume }),
+    });
+    const data = await response.json();
+    return data.success;
+  } catch {
+    return false;
+  }
+}
+
+export async function setMediaRoomMute(id: string, muted: boolean) {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const { updateMediaRoom } = useDeviceStore.getState();
+  
+  // Optimistic update
+  updateMediaRoom(id, { 
+    isMuted: muted,
+    currentMuteState: muted ? "Muted" : "Unmuted",
+  });
+  
+  try {
+    const response = await fetch("/api/crestron/media", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "mute", muted }),
+    });
+    const data = await response.json();
+    return data.success;
+  } catch {
+    return false;
+  }
+}
+
+export async function selectMediaRoomSource(id: string, sourceIndex: number) {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  const { updateMediaRoom, mediaRooms } = useDeviceStore.getState();
+  
+  // Find the media room to get the source name
+  const mediaRoom = mediaRooms.find(m => m.id === id);
+  const sourceName = mediaRoom?.availableProviders?.[sourceIndex];
+  
+  // Optimistic update
+  updateMediaRoom(id, { 
+    currentProviderId: sourceIndex,
+    currentSourceName: sourceName,
+  });
+  
+  try {
+    const response = await fetch("/api/crestron/media", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "source", sourceIndex }),
+    });
+    const data = await response.json();
+    return data.success;
+  } catch {
+    return false;
+  }
+}
+
+// Get media rooms grouped by zone (similar to thermostat zones)
+export interface MediaRoomZoneWithData {
+  zone: {
+    id: string;
+    name: string;
+  };
+  mediaRooms: MediaRoom[];
+  totalRooms: number;
+  playingCount: number;       // Number of rooms with power on
+  avgVolume: number;          // Average volume of playing rooms
+}
+
+export function getMediaRoomZonesWithData(): MediaRoomZoneWithData[] {
+  const { mediaRooms, areas, rooms } = useDeviceStore.getState();
+  
+  if (mediaRooms.length === 0) return [];
+  
+  // Build a map of roomId to area name
+  const roomToAreaMap = new Map<string, string>();
+  areas.forEach(area => {
+    area.roomIds.forEach(roomId => {
+      roomToAreaMap.set(roomId, area.name);
+    });
+  });
+  
+  // Zone display order (same as thermostats)
+  const ZONE_ORDER: Record<string, number> = {
+    "1st floor": 1,
+    "master suite": 2,
+    "2nd floor": 3,
+    "lower level": 4,
+    "exterior": 5,
+    "infrastructure": 6,
+  };
+  
+  const getZoneOrder = (zoneName: string): number => {
+    const normalized = zoneName.toLowerCase().trim();
+    return ZONE_ORDER[normalized] ?? 99;
+  };
+  
+  // Sort media rooms by area order
+  const sortedMediaRooms = [...mediaRooms].sort((a, b) => {
+    const areaA = a.roomId ? roomToAreaMap.get(a.roomId) || '' : '';
+    const areaB = b.roomId ? roomToAreaMap.get(b.roomId) || '' : '';
+    const orderA = getZoneOrder(areaA);
+    const orderB = getZoneOrder(areaB);
+    if (orderA !== orderB) return orderA - orderB;
+    const roomA = rooms.find(r => r.id === a.roomId)?.name || a.name;
+    const roomB = rooms.find(r => r.id === b.roomId)?.name || b.name;
+    return roomA.localeCompare(roomB);
+  });
+  
+  // Calculate whole house stats
+  const playingRooms = sortedMediaRooms.filter(m => m.isPoweredOn);
+  const avgVolume = playingRooms.length > 0
+    ? Math.round(playingRooms.reduce((sum, m) => sum + m.volumePercent, 0) / playingRooms.length)
+    : 0;
+  
+  // Whole House zone
+  const wholeHouseZone: MediaRoomZoneWithData = {
+    zone: { id: "whole-house", name: "Whole House" },
+    mediaRooms: sortedMediaRooms,
+    totalRooms: sortedMediaRooms.length,
+    playingCount: playingRooms.length,
+    avgVolume,
+  };
+  
+  // Create area-based zones
+  const areaZones: MediaRoomZoneWithData[] = areas.map(area => {
+    const zoneMediaRooms = sortedMediaRooms.filter(m => 
+      m.roomId && roomToAreaMap.get(m.roomId) === area.name
+    );
+    
+    const zonePlaying = zoneMediaRooms.filter(m => m.isPoweredOn);
+    const zoneAvgVolume = zonePlaying.length > 0
+      ? Math.round(zonePlaying.reduce((sum, m) => sum + m.volumePercent, 0) / zonePlaying.length)
+      : 0;
+    
+    return {
+      zone: { id: area.id, name: area.name },
+      mediaRooms: zoneMediaRooms,
+      totalRooms: zoneMediaRooms.length,
+      playingCount: zonePlaying.length,
+      avgVolume: zoneAvgVolume,
+    };
+  }).filter(zone => zone.mediaRooms.length > 0);
+  
+  // Sort area zones by order
+  areaZones.sort((a, b) => getZoneOrder(a.zone.name) - getZoneOrder(b.zone.name));
+  
+  return [wholeHouseZone, ...areaZones];
+}
+
+// Set power for all media rooms in a zone
+export async function setZoneMediaRoomPower(zoneId: string, powerState: "on" | "off"): Promise<boolean> {
+  const zones = getMediaRoomZonesWithData();
+  const zone = zones.find(z => z.zone.id === zoneId);
+  
+  if (!zone) return false;
+  
+  // Set power for all rooms in zone in parallel
+  const results = await Promise.all(
+    zone.mediaRooms.map(m => setMediaRoomPower(m.id, powerState))
+  );
+  
+  return results.every(Boolean);
+}
+
+// Set volume for all media rooms in a zone
+export async function setZoneMediaRoomVolume(zoneId: string, volumePercent: number): Promise<boolean> {
+  const zones = getMediaRoomZonesWithData();
+  const zone = zones.find(z => z.zone.id === zoneId);
+  
+  if (!zone) return false;
+  
+  // Only set volume on rooms that are powered on
+  const playingRooms = zone.mediaRooms.filter(m => m.isPoweredOn);
+  
+  const results = await Promise.all(
+    playingRooms.map(m => setMediaRoomVolume(m.id, volumePercent))
+  );
+  
+  return results.every(Boolean);
 }
 
 // Virtual Rooms CRUD operations
