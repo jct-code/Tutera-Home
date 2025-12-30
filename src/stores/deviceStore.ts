@@ -345,10 +345,8 @@ export async function fetchAllData(isRetryAfterRefresh = false) {
           areaName,
         };
       });
-      // Only update rooms if they changed
-      if (hasArrayChanged(store.rooms, transformedRooms)) {
-        store.setRooms(transformedRooms);
-      }
+      // Always update rooms - they contain areaId mappings critical for zone filtering
+      store.setRooms(transformedRooms);
     }
     
     // If areas don't have roomIds from API, build them from room data
@@ -384,8 +382,9 @@ export async function fetchAllData(isRetryAfterRefresh = false) {
       }
     }
     
-    // Only update areas if they changed
-    if (areas.length > 0 && hasArrayChanged(store.areas, areas)) {
+    // Always update areas - they contain critical roomId mappings for zone filtering
+    // Don't use change detection here as stale area data breaks zone assignment
+    if (areas.length > 0) {
       store.setAreas(areas);
     }
     
@@ -1885,7 +1884,8 @@ export function getLightingZonesWithData(): LightingZoneWithData[] {
   }
   
   // Helper function to group lights by room/virtual room
-  const groupLightsByRoom = (lightsToGroup: Light[]): LightingRoomGroup[] => {
+  // allowedRoomIds: optional set of room IDs to include (for zone-specific filtering)
+  const groupLightsByRoom = (lightsToGroup: Light[], allowedRoomIds?: Set<string>): LightingRoomGroup[] => {
     const roomGroups = new Map<string, { roomId: string; roomName: string; lights: Light[]; equipment: Light[] }>();
     
     for (const light of lightsToGroup) {
@@ -1910,8 +1910,13 @@ export function getLightingZonesWithData(): LightingZoneWithData[] {
     }
     
     // Also add rooms that only have equipment (no lights)
+    // Only add if the room is in the allowed set (or if no filter is provided for Whole House)
     for (const [roomId, roomEquipment] of equipmentByRoom.entries()) {
       if (!roomGroups.has(roomId)) {
+        // Skip if we have an allowed set and this room isn't in it
+        if (allowedRoomIds && !allowedRoomIds.has(roomId)) {
+          continue;
+        }
         const virtualRoom = roomToVirtualRoomMap.get(roomId);
         const displayRoomName = virtualRoom ? virtualRoom.name : (rooms.find(r => r.id === roomId)?.name || `Room ${roomId}`);
         roomGroups.set(roomId, {
@@ -2047,7 +2052,8 @@ export function getLightingZonesWithData(): LightingZoneWithData[] {
       ? Math.round((zoneLights.reduce((sum, l) => sum + Math.round((l.level / 65535) * 100), 0) / zoneLights.length))
       : 0;
     
-    const zoneRoomGroups = groupLightsByRoom(zoneLights);
+    // Pass allowed room IDs to filter equipment rooms to this zone only
+    const zoneRoomGroups = groupLightsByRoom(zoneLights, new Set(areaRoomIds));
     
     return {
       zone: {
