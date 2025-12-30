@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Music, RefreshCw, Power, Play, Layers, Building2 } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { MediaZoneControl } from "@/components/devices/MediaZoneControl";
@@ -36,7 +37,12 @@ type ViewMode = "zones" | "rooms";
 export default function MediaPage() {
   const router = useRouter();
   const { isConnected } = useAuthStore();
-  const { mediaRooms, rooms, isLoading } = useDeviceStore();
+  // Use useShallow to prevent re-renders when object references change but values are the same
+  const { mediaRooms, rooms, isLoading } = useDeviceStore(useShallow((state) => ({
+    mediaRooms: state.mediaRooms,
+    rooms: state.rooms,
+    isLoading: state.isLoading,
+  })));
   
   // View mode: zones (grouped by floor) or rooms (individual)
   const [viewMode, setViewMode] = useState<ViewMode>("zones");

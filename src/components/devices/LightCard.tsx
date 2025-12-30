@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Lightbulb, Sun } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import type { Light } from "@/lib/crestron/types";
-import { setLightState } from "@/stores/deviceStore";
+import { setLightState, useDeviceStore } from "@/stores/deviceStore";
 
 // Helper to get/set last brightness level from localStorage
 const LAST_BRIGHTNESS_KEY = "tutera-last-brightness";
@@ -181,16 +181,25 @@ export function useSwipeControl(options: {
 export function LightCard({ light, compact = false, roomName }: LightCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   
-  const percent = levelToPercent(light.level);
-  const isOn = light.isOn || light.level > 0;
-  const isDimmer = light.subType === "dimmer";
+  // Subscribe to the store directly to get the latest light state
+  // This ensures updates are reflected immediately regardless of parent re-renders
+  const storeLight = useDeviceStore(
+    (state) => state.lights.find((l) => l.id === light.id)
+  );
+  
+  // Use store light if available, otherwise fall back to prop
+  const currentLight = storeLight || light;
+  
+  const percent = levelToPercent(currentLight.level);
+  const isOn = currentLight.isOn || currentLight.level > 0;
+  const isDimmer = currentLight.subType === "dimmer";
 
   // Track last brightness when light is on
   useEffect(() => {
     if (isOn && percent > 0) {
-      setLastBrightness(light.id, percent);
+      setLastBrightness(currentLight.id, percent);
     }
-  }, [light.id, isOn, percent]);
+  }, [currentLight.id, isOn, percent]);
 
   const handleToggle = useCallback(async (turnOn: boolean) => {
     if (isUpdating) return;
@@ -198,21 +207,21 @@ export function LightCard({ light, compact = false, roomName }: LightCardProps) 
     try {
       if (turnOn) {
         // Get last brightness or use 75% as default
-        const lastBrightness = getLastBrightness(light.id);
+        const lastBrightness = getLastBrightness(currentLight.id);
         const targetPercent = lastBrightness !== null ? lastBrightness : 75;
         const targetLevel = percentToLevel(targetPercent);
-        await setLightState(light.id, targetLevel, true);
+        await setLightState(currentLight.id, targetLevel, true);
       } else {
         // Save current brightness before turning off
         if (percent > 0) {
-          setLastBrightness(light.id, percent);
+          setLastBrightness(currentLight.id, percent);
         }
-        await setLightState(light.id, 0, false);
+        await setLightState(currentLight.id, 0, false);
       }
     } finally {
       setIsUpdating(false);
     }
-  }, [light.id, isUpdating, percent]);
+  }, [currentLight.id, isUpdating, percent]);
 
   // Handle icon click toggle
   const handleIconClick = useCallback(async (e: React.MouseEvent | React.PointerEvent) => {
@@ -231,9 +240,9 @@ export function LightCard({ light, compact = false, roomName }: LightCardProps) 
     if (isUpdating) return;
     setIsUpdating(true);
     const newLevel = percentToLevel(Math.max(0, Math.min(100, newPercent)));
-    await setLightState(light.id, newLevel, newPercent > 0);
+    await setLightState(currentLight.id, newLevel, newPercent > 0);
     setIsUpdating(false);
-  }, [light.id, isUpdating]);
+  }, [currentLight.id, isUpdating]);
 
   const {
     cardRef,

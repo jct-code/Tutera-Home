@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   ShieldAlert,
 } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { LockCard, LockAllButton } from "@/components/devices/LockCard";
@@ -37,7 +38,13 @@ const itemVariants = {
 export default function SecurityPage() {
   const router = useRouter();
   const { isConnected } = useAuthStore();
-  const { doorLocks, sensors, securityDevices, isLoading } = useDeviceStore();
+  // Use useShallow to prevent re-renders when object references change but values are the same
+  const { doorLocks, sensors, securityDevices, isLoading } = useDeviceStore(useShallow((state) => ({
+    doorLocks: state.doorLocks,
+    sensors: state.sensors,
+    securityDevices: state.securityDevices,
+    isLoading: state.isLoading,
+  })));
 
   // Filter to security-related sensors
   const securitySensors = sensors.filter(

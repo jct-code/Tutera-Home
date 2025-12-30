@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Lightbulb, RefreshCw, Layers, Building2 } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { LightingZoneControl } from "@/components/devices/LightingZoneControl";
@@ -32,7 +33,11 @@ type ViewMode = "zones" | "rooms";
 export default function LightingPage() {
   const router = useRouter();
   const { isConnected } = useAuthStore();
-  const { lights, isLoading } = useDeviceStore();
+  // Use useShallow to prevent re-renders when object references change but values are the same
+  const { lights, isLoading } = useDeviceStore(useShallow((state) => ({
+    lights: state.lights,
+    isLoading: state.isLoading,
+  })));
   
   // View mode: zones (grouped by area) or rooms (individual)
   const [viewMode, setViewMode] = useState<ViewMode>("zones");

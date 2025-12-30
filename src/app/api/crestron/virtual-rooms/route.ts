@@ -4,6 +4,9 @@ import path from "path";
 import type { VirtualRoom } from "@/lib/crestron/types";
 import { CrestronClient } from "@/lib/crestron/client";
 
+// Force dynamic rendering - disable route caching
+export const dynamic = 'force-dynamic';
+
 function getClientConfig(request: NextRequest) {
   const processorIp = request.headers.get("x-processor-ip");
   const authKey = request.headers.get("x-auth-key");

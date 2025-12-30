@@ -17,6 +17,7 @@ import {
   Music,
 } from "lucide-react";
 import Link from "next/link";
+import { useShallow } from "zustand/react/shallow";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { Card } from "@/components/ui/Card";
@@ -56,6 +57,7 @@ const itemVariants = {
 export default function Dashboard() {
   const router = useRouter();
   const { isConnected } = useAuthStore();
+  // Use useShallow to prevent re-renders when object references change but values are the same
   const { 
     areas,
     rooms, 
@@ -68,7 +70,19 @@ export default function Dashboard() {
     sensors,
     mediaRooms,
     isLoading,
-  } = useDeviceStore();
+  } = useDeviceStore(useShallow((state) => ({
+    areas: state.areas,
+    rooms: state.rooms,
+    virtualRooms: state.virtualRooms,
+    lights: state.lights,
+    shades: state.shades,
+    scenes: state.scenes,
+    thermostats: state.thermostats,
+    doorLocks: state.doorLocks,
+    sensors: state.sensors,
+    mediaRooms: state.mediaRooms,
+    isLoading: state.isLoading,
+  })));
   
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [roomViewMode, setRoomViewMode] = useState<"zones" | "rooms">("zones");

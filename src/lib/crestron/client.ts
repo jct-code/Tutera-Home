@@ -52,6 +52,9 @@ export class CrestronClient {
     const method = options.method || "GET";
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
+      // Add cache-control headers to prevent any caching
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
     };
     
     // Only add Content-Type for requests with a body
@@ -67,9 +70,17 @@ export class CrestronClient {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      // Add cache-busting timestamp to prevent Crestron processor from returning cached data
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const cacheBustUrl = `${this.baseUrl}${endpoint}${separator}_t=${Date.now()}`;
+      
+      const response = await fetch(cacheBustUrl, {
         ...options,
         headers,
+        // CRITICAL: Disable Next.js fetch caching to always get fresh data from Crestron
+        // Without this, device status changes made via physical devices or Crestron Home
+        // iOS app will not be reflected because Next.js caches fetch responses by default
+        cache: 'no-store',
       });
 
       // HTTP 409 Conflict typically means the resource is already in the requested state

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Palette, RefreshCw, ChevronDown, Home, Lightbulb, Music, Zap } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { SceneCard } from "@/components/devices/SceneCard";
@@ -61,7 +62,11 @@ interface RoomSceneGroup {
 export default function ScenesPage() {
   const router = useRouter();
   const { isConnected } = useAuthStore();
-  const { scenes, isLoading } = useDeviceStore();
+  // Use useShallow to prevent re-renders when object references change but values are the same
+  const { scenes, isLoading } = useDeviceStore(useShallow((state) => ({
+    scenes: state.scenes,
+    isLoading: state.isLoading,
+  })));
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Thermometer, RefreshCw, Droplets, CloudSun, Home, Building2, Layers } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { ThermostatRoomGroup } from "@/components/devices/ThermostatRoomGroup";
@@ -34,7 +35,12 @@ type ViewMode = "zones" | "rooms";
 export default function ClimatePage() {
   const router = useRouter();
   const { isConnected } = useAuthStore();
-  const { thermostats, sensors, isLoading } = useDeviceStore();
+  // Use useShallow to prevent re-renders when object references change but values are the same
+  const { thermostats, sensors, isLoading } = useDeviceStore(useShallow((state) => ({
+    thermostats: state.thermostats,
+    sensors: state.sensors,
+    isLoading: state.isLoading,
+  })));
   const { outsideTemp } = useWeatherStore();
   
   // View mode: zones (grouped by floor) or rooms (individual)

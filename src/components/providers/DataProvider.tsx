@@ -5,11 +5,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { fetchAllData, useDeviceStore, checkTemperatureSatisfaction } from "@/stores/deviceStore";
 import { useThemeStore, applyTheme } from "@/stores/themeStore";
 
-// Default to 3 seconds if env var not set (faster polling for near real-time updates)
-const REFRESH_INTERVAL = parseInt(
-  process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS || "3000",
-  10
-);
+// Polling interval in milliseconds (3 seconds for near real-time updates)
+// Hardcoded to ensure consistent behavior regardless of environment variables
+const REFRESH_INTERVAL = 3000;
 
 interface DataProviderProps {
   children: React.ReactNode;

@@ -241,7 +241,12 @@ export const useDeviceStore = create<DeviceState>()(
 // Fetch helpers
 async function fetchWithAuth(endpoint: string) {
   const headers = useAuthStore.getState().getAuthHeaders();
-  const response = await fetch(`/api/crestron/${endpoint}`, { headers });
+  // CRITICAL: Use cache: 'no-store' to prevent browser caching
+  // This ensures we always get fresh data from the Crestron processor
+  const response = await fetch(`/api/crestron/${endpoint}`, { 
+    headers,
+    cache: 'no-store',
+  });
   return response.json();
 }
 
@@ -267,7 +272,7 @@ export async function fetchAllData(isRetryAfterRefresh = false) {
       fetchWithAuth("rooms"),
       fetchWithAuth("devices"),
       fetchWithAuth("scenes"),
-      fetch("/api/crestron/virtual-rooms").then(res => res.json()),
+      fetch("/api/crestron/virtual-rooms", { cache: 'no-store' }).then(res => res.json()),
     ]);
     
     // Check if all responses indicate potential auth failure (empty data or errors)
@@ -1305,6 +1310,7 @@ export async function setMediaRoomPower(id: string, powerState: "on" | "off") {
       const roomResponse = await fetch(`/api/crestron/media?roomId=${id}`, {
         method: "GET",
         headers,
+        cache: 'no-store',
       });
       const roomData = await roomResponse.json();
       
@@ -1623,7 +1629,7 @@ export async function setZoneMediaRoomSource(zoneId: string, sourceName: string)
 export async function fetchVirtualRooms() {
   const { setVirtualRooms, setError } = useDeviceStore.getState();
   try {
-    const response = await fetch("/api/crestron/virtual-rooms");
+    const response = await fetch("/api/crestron/virtual-rooms", { cache: 'no-store' });
     const data = await response.json();
     if (data.success && Array.isArray(data.data)) {
       setVirtualRooms(data.data);

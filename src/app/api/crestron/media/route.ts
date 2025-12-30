@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CrestronClient } from "@/lib/crestron/client";
 
+// Force dynamic rendering - disable route caching to always get fresh device data
+export const dynamic = 'force-dynamic';
+
 // Transform Crestron media room to our interface format (same as devices route)
 interface CrestronMediaRoom {
   id: number;

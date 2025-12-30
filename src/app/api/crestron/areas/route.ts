@@ -3,6 +3,9 @@ import { CrestronClient } from "@/lib/crestron/client";
 import { promises as fs } from "fs";
 import path from "path";
 
+// Force dynamic rendering - disable route caching to always get fresh data
+export const dynamic = 'force-dynamic';
+
 const ROOM_AREAS_FILE = path.join(process.cwd(), "data", "room-areas.json");
 
 function getClientConfig(request: NextRequest) {
