@@ -19,6 +19,7 @@ import type { MediaRoomZoneWithData } from "@/stores/deviceStore";
 import { 
   setZoneMediaRoomPower,
   setZoneMediaRoomVolume,
+  setZoneMediaRoomSource,
   useDeviceStore,
 } from "@/stores/deviceStore";
 
@@ -35,6 +36,7 @@ export function MediaZoneControl({
 }: MediaZoneControlProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [localVolume, setLocalVolume] = useState(zoneData.avgVolume);
+  const [showZoneSourcePicker, setShowZoneSourcePicker] = useState(false);
   const { rooms } = useDeviceStore();
   
   const { zone, mediaRooms, totalRooms, playingCount, avgVolume } = zoneData;
@@ -45,6 +47,22 @@ export function MediaZoneControl({
     rooms.forEach(room => map.set(room.id, room.name));
     return map;
   }, [rooms]);
+  
+  // Get all unique sources across all rooms in this zone, with count of how many rooms have each
+  const zoneSources = useMemo(() => {
+    const sourceMap = new Map<string, number>();
+    
+    mediaRooms.forEach(room => {
+      room.availableProviders.forEach(source => {
+        sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+      });
+    });
+    
+    // Convert to array and sort by availability (most common first)
+    return Array.from(sourceMap.entries())
+      .map(([name, count]) => ({ name, count, isUniversal: count === mediaRooms.length }))
+      .sort((a, b) => b.count - a.count);
+  }, [mediaRooms]);
   
   // Get display name for a media room
   const getDisplayName = useCallback((roomId: string | undefined, defaultName: string) => {
@@ -90,6 +108,13 @@ export function MediaZoneControl({
     setIsUpdating(false);
   }, [zone.id]);
   
+  const handleZoneSourceSelect = useCallback(async (sourceName: string) => {
+    setIsUpdating(true);
+    setShowZoneSourcePicker(false);
+    await setZoneMediaRoomSource(zone.id, sourceName);
+    setIsUpdating(false);
+  }, [zone.id]);
+  
   // Icon for zone type
   const ZoneIcon = zone.id === "whole-house" ? Home : Building2;
   
@@ -99,10 +124,10 @@ export function MediaZoneControl({
       className={`
         transition-all duration-300
         ${isAnyPlaying 
-          ? "bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20" 
+          ? "bg-gradient-to-br from-slate-500/10 to-slate-500/5 border-slate-500/20" 
           : "bg-gradient-to-br from-[var(--surface)]/50 to-transparent"
         }
-        ${expanded ? "ring-2 ring-purple-500/30" : ""}
+        ${expanded ? "ring-2 ring-slate-500/30" : ""}
       `}
     >
       {/* Zone Header */}
@@ -115,7 +140,7 @@ export function MediaZoneControl({
             className={`
               w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-all duration-200
               ${isAnyPlaying 
-                ? "bg-purple-500 shadow-purple-500/30" 
+                ? "bg-slate-600 shadow-slate-600/30" 
                 : "bg-[var(--surface-hover)]"
               }
             `}
@@ -166,7 +191,7 @@ export function MediaZoneControl({
                   flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl
                   transition-all duration-200 font-medium
                   ${playingCount === totalRooms
-                    ? "bg-purple-500 text-white shadow-lg shadow-purple-500/30"
+                    ? "bg-slate-600 text-white shadow-lg shadow-slate-600/30"
                     : "bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
                   }
                   disabled:opacity-50
@@ -193,6 +218,51 @@ export function MediaZoneControl({
               </button>
             </div>
           </div>
+          
+          {/* Zone Source Selector */}
+          {zoneSources.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
+                Select Source for All Rooms
+              </p>
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowZoneSourcePicker(!showZoneSourcePicker); }}
+                  disabled={isUpdating}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 border border-slate-500/30 transition-colors text-left text-sm"
+                >
+                  <span className="text-slate-400">Select a source to play on all rooms...</span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showZoneSourcePicker ? "rotate-180" : ""}`} />
+                </button>
+                
+                {showZoneSourcePicker && (
+                  <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] max-h-64 overflow-y-auto">
+                    {zoneSources.map((source, index) => (
+                      <button
+                        key={source.name}
+                        onClick={(e) => { e.stopPropagation(); handleZoneSourceSelect(source.name); }}
+                        className={`
+                          w-full px-3 py-2.5 text-left text-sm hover:bg-[var(--surface-hover)] transition-colors
+                          ${index === 0 ? "rounded-t-lg" : ""}
+                          ${index === zoneSources.length - 1 ? "rounded-b-lg" : ""}
+                        `}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[var(--text-primary)]">{source.name}</span>
+                          <span className={`text-xs ${source.isUniversal ? "text-green-500" : "text-[var(--text-tertiary)]"}`}>
+                            {source.isUniversal ? "All rooms" : `${source.count} of ${totalRooms} rooms`}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                Rooms without the selected source will remain unchanged
+              </p>
+            </div>
+          )}
           
           {/* Zone Volume Control - only show when at least one room is playing */}
           {isAnyPlaying && (
@@ -227,13 +297,12 @@ export function MediaZoneControl({
             <p className="text-xs font-medium text-[var(--text-tertiary)] mb-3">
               Rooms in this zone ({mediaRooms.length}):
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {mediaRooms.map((mediaRoom) => (
                 <MediaRoomCard
                   key={mediaRoom.id}
                   mediaRoom={mediaRoom}
                   roomName={getDisplayName(mediaRoom.roomId, mediaRoom.name)}
-                  compact
                 />
               ))}
             </div>
@@ -249,7 +318,7 @@ export function MediaZoneControl({
               className={`
                 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
                 ${isAnyPlaying 
-                  ? "bg-purple-500/15 text-purple-500" 
+                  ? "bg-slate-500/15 text-slate-400" 
                   : "bg-[var(--surface)] text-[var(--text-tertiary)]"
                 }
               `}

@@ -57,7 +57,7 @@ export function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1 ml-8">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -92,22 +92,12 @@ export function Header() {
 
           {/* Right Side */}
           <div className="flex items-center gap-3">
-            {/* Connection Status */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-full)] bg-[var(--surface)]">
+            {/* Connection Status - just icon */}
+            <div className="hidden sm:flex items-center" title={isConnected ? `Connected: ${processorIp}` : "Disconnected"}>
               {isConnected ? (
-                <>
-                  <Wifi className="w-4 h-4 text-[var(--success)]" />
-                  <span className="text-xs text-[var(--text-secondary)]">
-                    {processorIp}
-                  </span>
-                </>
+                <Wifi className="w-4 h-4 text-[var(--success)]" />
               ) : (
-                <>
-                  <WifiOff className="w-4 h-4 text-[var(--danger)]" />
-                  <span className="text-xs text-[var(--text-secondary)]">
-                    Disconnected
-                  </span>
-                </>
+                <WifiOff className="w-4 h-4 text-[var(--danger)]" />
               )}
             </div>
 
@@ -172,7 +162,7 @@ export function Header() {
                   <WifiOff className="w-4 h-4 text-[var(--danger)]" />
                 )}
                 <span className="text-sm text-[var(--text-secondary)]">
-                  {isConnected ? processorIp : "Disconnected"}
+                  {isConnected ? "Connected" : "Disconnected"}
                 </span>
               </div>
               <button

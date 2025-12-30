@@ -33,24 +33,30 @@ function transformMediaRoom(m: CrestronMediaRoom) {
   // Handle both availableSources (array of objects) and availableProviders (array of strings)
   let availableProviders: string[] = [];
   let currentProviderId: number | undefined = undefined;
+  let currentSourceName: string | undefined = undefined;
   
   if (m.availableSources && Array.isArray(m.availableSources) && m.availableSources.length > 0) {
     // New format: extract sourceName from each object
     availableProviders = m.availableSources.map(s => s.sourceName);
-    // currentSourceId is the index into availableSources array
-    if (m.currentSourceId !== undefined && m.currentSourceId >= 0 && m.currentSourceId < availableProviders.length) {
-      currentProviderId = m.currentSourceId;
+    
+    // currentSourceId is the ACTUAL source ID (e.g., 53017), not an array index
+    // We need to find the index by matching the ID in availableSources
+    if (m.currentSourceId !== undefined) {
+      const sourceIndex = m.availableSources.findIndex(s => s.id === m.currentSourceId);
+      if (sourceIndex !== -1) {
+        currentProviderId = sourceIndex;
+        currentSourceName = m.availableSources[sourceIndex].sourceName;
+      }
     }
   } else if (m.availableProviders && Array.isArray(m.availableProviders)) {
     // Old format: already an array of strings
     availableProviders = m.availableProviders;
     currentProviderId = m.currentProviderId;
+    // For old format, use index directly
+    if (currentProviderId !== undefined && currentProviderId >= 0 && currentProviderId < availableProviders.length) {
+      currentSourceName = availableProviders[currentProviderId];
+    }
   }
-  
-  // Resolve current source name from provider ID/index
-  const currentSourceName = currentProviderId !== undefined && availableProviders.length > 0
-    ? availableProviders[currentProviderId] || undefined
-    : undefined;
   
   return {
     id: String(m.id),
@@ -103,7 +109,6 @@ export async function GET(request: NextRequest) {
     // Fetch individual media room
     const result = await client.getMediaRoom(roomId);
     
-    console.log(`[Media API] Individual room fetch (ID: ${roomId}):`, JSON.stringify(result, null, 2));
     
     if (result.success && result.data) {
       // Handle the nested structure where the API returns { mediaRooms: [...] }
@@ -120,12 +125,8 @@ export async function GET(request: NextRequest) {
       // If it's a raw CrestronMediaRoom object (has number id or availableSources), transform it
       if (typeof transformedData === 'object' && transformedData !== null && 
           (typeof transformedData.id === 'number' || 'availableSources' in transformedData)) {
-        console.log(`[Media API] Transforming raw media room data`);
         transformedData = transformMediaRoom(transformedData as CrestronMediaRoom);
       }
-      
-      console.log(`[Media API] Transformed data:`, JSON.stringify(transformedData, null, 2));
-      console.log(`[Media API] Available providers:`, transformedData?.availableProviders);
       
       return NextResponse.json({
         success: true,
@@ -227,6 +228,7 @@ export async function POST(request: NextRequest) {
         // The Crestron selectsource API expects the actual source ID, not the array index
         // Fetch the room data to get the availableSources array and look up the real ID
         const roomResult = await client.getMediaRoom(id);
+        
         if (!roomResult.success || !roomResult.data) {
           return NextResponse.json(
             { success: false, error: "Failed to fetch room data for source selection" },

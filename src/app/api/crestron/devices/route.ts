@@ -220,24 +220,30 @@ function transformMediaRoom(m: CrestronMediaRoom) {
   // Handle both availableSources (array of objects) and availableProviders (array of strings)
   let availableProviders: string[] = [];
   let currentProviderId: number | undefined = undefined;
+  let currentSourceName: string | undefined = undefined;
   
   if (m.availableSources && Array.isArray(m.availableSources) && m.availableSources.length > 0) {
     // New format: extract sourceName from each object
     availableProviders = m.availableSources.map(s => s.sourceName);
-    // currentSourceId is the index into availableSources array
-    if (m.currentSourceId !== undefined && m.currentSourceId >= 0 && m.currentSourceId < availableProviders.length) {
-      currentProviderId = m.currentSourceId;
+    
+    // currentSourceId is the ACTUAL source ID (e.g., 53017), not an array index
+    // We need to find the index by matching the ID in availableSources
+    if (m.currentSourceId !== undefined) {
+      const sourceIndex = m.availableSources.findIndex(s => s.id === m.currentSourceId);
+      if (sourceIndex !== -1) {
+        currentProviderId = sourceIndex;
+        currentSourceName = m.availableSources[sourceIndex].sourceName;
+      }
     }
   } else if (m.availableProviders && Array.isArray(m.availableProviders)) {
     // Old format: already an array of strings
     availableProviders = m.availableProviders;
     currentProviderId = m.currentProviderId;
+    // For old format, use index directly
+    if (currentProviderId !== undefined && currentProviderId >= 0 && currentProviderId < availableProviders.length) {
+      currentSourceName = availableProviders[currentProviderId];
+    }
   }
-  
-  // Resolve current source name from provider ID
-  const currentSourceName = currentProviderId !== undefined && availableProviders.length > 0
-    ? availableProviders[currentProviderId] || undefined
-    : undefined;
   
   return {
     id: String(m.id),

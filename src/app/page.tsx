@@ -342,6 +342,7 @@ export default function Dashboard() {
                       room={roomStatus.room}
                       lightingStatus={roomStatus.lightingStatus}
                       climateStatus={roomStatus.climateStatus}
+                      mediaStatus={roomStatus.mediaStatus}
                     />
                   </motion.div>
                 ))}

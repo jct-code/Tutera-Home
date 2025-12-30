@@ -7,6 +7,7 @@ import {
   Lightbulb,
   Thermometer,
   Home,
+  Music,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { RoomStatusTile } from "@/components/devices/RoomStatusTile";
@@ -23,7 +24,7 @@ export function RoomZoneControl({
   expanded = false,
   onToggleExpand 
 }: RoomZoneControlProps) {
-  const { zone, rooms, totalRooms, totalLights, lightsOn, avgBrightness, avgCurrentTemp, activeThermostats } = zoneData;
+  const { zone, rooms, totalRooms, totalLights, lightsOn, avgBrightness, avgCurrentTemp, activeThermostats, totalMediaRooms, mediaRoomsOn, activeMediaSource } = zoneData;
   
   const lightsOff = totalLights - lightsOn;
   const ZoneIcon = zone.id === "whole-house" ? Home : Building2;
@@ -56,6 +57,12 @@ export function RoomZoneControl({
               )}
               {avgCurrentTemp > 0 && (
                 <span className="text-[var(--climate-color)] font-medium">{avgCurrentTemp}°</span>
+              )}
+              {totalMediaRooms > 0 && mediaRoomsOn > 0 && (
+                <span className="text-slate-500 font-medium flex items-center gap-1">
+                  <Music className="w-3 h-3" />
+                  {mediaRoomsOn} playing
+                </span>
               )}
             </div>
           </div>
@@ -105,6 +112,7 @@ export function RoomZoneControl({
                 room={roomStatus.room}
                 lightingStatus={roomStatus.lightingStatus}
                 climateStatus={roomStatus.climateStatus}
+                mediaStatus={roomStatus.mediaStatus}
               />
             ))}
           </div>

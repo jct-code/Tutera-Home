@@ -321,7 +321,9 @@ export class CrestronClient {
   async setMediaRoomVolume(id: string, volumePercent: number): Promise<ApiResponse<void>> {
     // Clamp volume to 0-100 range
     const clampedPercent = Math.max(0, Math.min(100, volumePercent));
-    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_VOLUME(id, clampedPercent), {
+    // Convert percentage (0-100) to raw Crestron volume level (0-65535)
+    const rawLevel = Math.round((clampedPercent / 100) * 65535);
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_VOLUME(id, rawLevel), {
       method: "POST",
     });
   }
@@ -336,6 +338,24 @@ export class CrestronClient {
     return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_SELECT_SOURCE(id, sourceIndex), {
       method: "POST",
     });
+  }
+
+  // Video Rooms (may contain display/TV info)
+  async getVideoRooms(): Promise<ApiResponse<unknown[]>> {
+    return this.request<unknown[]>(CRESTRON_ENDPOINTS.VIDEO_ROOMS);
+  }
+
+  async getVideoRoom(id: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>(CRESTRON_ENDPOINTS.VIDEO_ROOM(id));
+  }
+
+  // Sources (may contain source type info)
+  async getSources(): Promise<ApiResponse<unknown[]>> {
+    return this.request<unknown[]>(CRESTRON_ENDPOINTS.SOURCES);
+  }
+
+  async getSource(id: string): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>(CRESTRON_ENDPOINTS.SOURCE(id));
   }
 
   // Quick Actions

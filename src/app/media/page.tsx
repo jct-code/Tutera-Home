@@ -87,7 +87,7 @@ export default function MediaPage() {
         {/* Page Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-500 to-zinc-600 flex items-center justify-center">
               <Music className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -115,9 +115,9 @@ export default function MediaPage() {
           {/* Quick Stats */}
           <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {/* Rooms Playing */}
-            <Card padding="md" className={`flex items-center gap-3 ${playingCount > 0 ? "bg-gradient-to-br from-purple-500/10 to-transparent" : ""}`}>
+            <Card padding="md" className={`flex items-center gap-3 ${playingCount > 0 ? "bg-gradient-to-br from-slate-500/10 to-transparent" : ""}`}>
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                playingCount > 0 ? "bg-purple-500" : "bg-[var(--surface-hover)]"
+                playingCount > 0 ? "bg-slate-600" : "bg-[var(--surface-hover)]"
               }`}>
                 <Play className={`w-6 h-6 ${playingCount > 0 ? "text-white" : "text-[var(--text-tertiary)]"}`} />
               </div>
@@ -134,8 +134,8 @@ export default function MediaPage() {
             {/* Average Volume (only when playing) */}
             {playingCount > 0 && (
               <Card padding="md" className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                  <Music className="w-6 h-6 text-purple-500" />
+                <div className="w-12 h-12 rounded-xl bg-slate-500/20 flex items-center justify-center">
+                  <Music className="w-6 h-6 text-slate-400" />
                 </div>
                 <div>
                   <p className="text-3xl font-semibold">{avgVolume}%</p>
@@ -176,7 +176,7 @@ export default function MediaPage() {
                       flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
                       transition-all duration-200
                       ${viewMode === "zones"
-                        ? "bg-purple-500 text-white shadow-sm"
+                        ? "bg-slate-600 text-white shadow-sm"
                         : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
                       }
                     `}
@@ -190,7 +190,7 @@ export default function MediaPage() {
                       flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
                       transition-all duration-200
                       ${viewMode === "rooms"
-                        ? "bg-purple-500 text-white shadow-sm"
+                        ? "bg-slate-600 text-white shadow-sm"
                         : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
                       }
                     `}

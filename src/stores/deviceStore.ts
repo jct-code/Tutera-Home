@@ -1553,6 +1553,42 @@ export async function setZoneMediaRoomVolume(zoneId: string, volumePercent: numb
   return results.every(Boolean);
 }
 
+// Set source for all media rooms in a zone that have that source available
+export async function setZoneMediaRoomSource(zoneId: string, sourceName: string): Promise<{ success: number; skipped: number }> {
+  const zones = getMediaRoomZonesWithData();
+  const zone = zones.find(z => z.zone.id === zoneId);
+  
+  if (!zone) return { success: 0, skipped: 0 };
+  
+  let successCount = 0;
+  let skippedCount = 0;
+  
+  // Process each room - only select source if room has that source available
+  const promises = zone.mediaRooms.map(async (room) => {
+    // Find the source index by name in this room's available providers
+    const sourceIndex = room.availableProviders.findIndex(
+      provider => provider.toLowerCase() === sourceName.toLowerCase()
+    );
+    
+    if (sourceIndex === -1) {
+      // Room doesn't have this source - skip it
+      skippedCount++;
+      return false;
+    }
+    
+    // Room has this source - select it (this will also power on the room)
+    const result = await selectMediaRoomSource(room.id, sourceIndex);
+    if (result) {
+      successCount++;
+    }
+    return result;
+  });
+  
+  await Promise.all(promises);
+  
+  return { success: successCount, skipped: skippedCount };
+}
+
 // Virtual Rooms CRUD operations
 
 export async function fetchVirtualRooms() {
@@ -2068,11 +2104,32 @@ export interface RoomStatus {
     setPoint: number;
     mode: string;
   } | null;
+  mediaStatus: {
+    isPoweredOn: boolean;
+    currentSourceName: string | null;
+    isVideo: boolean;
+  } | null;
+}
+
+// Helper to detect if a source is video-based from its name
+function isVideoSource(sourceName: string | undefined): boolean {
+  if (!sourceName) return false;
+  
+  const videoKeywords = [
+    'tv', 'apple tv', 'roku', 'firestick', 'fire stick', 'chromecast',
+    'hdmi', 'video', 'nvr', 'camera', 'dvr', 'cable', 'satellite',
+    'dish', 'directv', 'xfinity', 'projector', 'bluray', 'blu-ray',
+    'dvd', 'gaming', 'xbox', 'playstation', 'nintendo', 'switch',
+    'screen', 'display', 'monitor'
+  ];
+  
+  const lowerName = sourceName.toLowerCase();
+  return videoKeywords.some(keyword => lowerName.includes(keyword));
 }
 
 // Get all rooms with combined lighting and climate status (includes virtual rooms)
 export function getRoomsWithStatus(): RoomStatus[] {
-  const { rooms, lights, thermostats, areas, virtualRooms } = useDeviceStore.getState();
+  const { rooms, lights, thermostats, areas, virtualRooms, mediaRooms } = useDeviceStore.getState();
   
   // Filter out equipment controls
   const { actualLights } = separateLightsAndEquipment(lights);
@@ -2099,10 +2156,19 @@ export function getRoomsWithStatus(): RoomStatus[] {
     thermostatMap.set(pair.roomId, pair);
   });
   
+  // Build a map of roomId to media room
+  const mediaRoomMap = new Map<string, typeof mediaRooms[0]>();
+  mediaRooms.forEach(mediaRoom => {
+    if (mediaRoom.roomId) {
+      mediaRoomMap.set(mediaRoom.roomId, mediaRoom);
+    }
+  });
+  
   // Combine data for each regular room
   const roomStatuses: RoomStatus[] = rooms.map(room => {
     const lightingGroup = lightingMap.get(room.id);
     const thermostatPair = thermostatMap.get(room.id);
+    const mediaRoom = mediaRoomMap.get(room.id);
     
     const lightingStatus = lightingGroup ? {
       lightsOn: lightingGroup.lightsOn,
@@ -2120,10 +2186,17 @@ export function getRoomsWithStatus(): RoomStatus[] {
       mode: thermostatPair.mainThermostat.mode || "off",
     } : null;
     
+    const mediaStatus = mediaRoom ? {
+      isPoweredOn: mediaRoom.isPoweredOn,
+      currentSourceName: mediaRoom.currentSourceName || null,
+      isVideo: isVideoSource(mediaRoom.currentSourceName),
+    } : null;
+    
     return {
       room,
       lightingStatus,
       climateStatus,
+      mediaStatus,
     };
   });
   
@@ -2176,6 +2249,33 @@ export function getRoomsWithStatus(): RoomStatus[] {
       mode: hasActiveClimate ? "auto" : "off",
     } : null;
     
+    // Aggregate media status from all source rooms
+    let hasMediaOn = false;
+    let activeSourceName: string | null = null;
+    let hasVideo = false;
+    
+    virtualRoom.sourceRoomIds.forEach(roomId => {
+      const mediaRoom = mediaRoomMap.get(roomId);
+      if (mediaRoom) {
+        if (mediaRoom.isPoweredOn) {
+          hasMediaOn = true;
+          if (!activeSourceName && mediaRoom.currentSourceName) {
+            activeSourceName = mediaRoom.currentSourceName;
+            hasVideo = isVideoSource(mediaRoom.currentSourceName);
+          }
+        }
+      }
+    });
+    
+    // Check if any source room has a media room
+    const hasAnyMedia = virtualRoom.sourceRoomIds.some(roomId => mediaRoomMap.has(roomId));
+    
+    const mediaStatus = hasAnyMedia ? {
+      isPoweredOn: hasMediaOn,
+      currentSourceName: activeSourceName,
+      isVideo: hasVideo,
+    } : null;
+    
     // Create a virtual Room object for the virtual room
     const virtualRoomObj: Room = {
       id: virtualRoom.id,
@@ -2188,6 +2288,7 @@ export function getRoomsWithStatus(): RoomStatus[] {
       room: virtualRoomObj,
       lightingStatus,
       climateStatus,
+      mediaStatus,
     };
   });
   
@@ -2232,6 +2333,10 @@ export interface RoomZoneWithData {
   avgCurrentTemp: number;
   avgSetPoint: number;
   activeThermostats: number;
+  // Media stats
+  totalMediaRooms: number;
+  mediaRoomsOn: number;
+  activeMediaSource: string | null;
 }
 
 // Get rooms grouped by zone/area with combined lighting and climate data
@@ -2276,6 +2381,11 @@ export function getRoomZonesWithData(): RoomZoneWithData[] {
     rs.climateStatus !== null && rs.climateStatus.mode !== "off"
   ).length;
   
+  // Media stats for Whole House
+  const wholeHouseTotalMedia = wholeHouseRooms.filter(rs => rs.mediaStatus !== null).length;
+  const wholeHouseMediaOn = wholeHouseRooms.filter(rs => rs.mediaStatus?.isPoweredOn).length;
+  const wholeHouseActiveSource = wholeHouseRooms.find(rs => rs.mediaStatus?.isPoweredOn && rs.mediaStatus?.currentSourceName)?.mediaStatus?.currentSourceName || null;
+  
   const wholeHouseZone: RoomZoneWithData = {
     zone: {
       id: "whole-house",
@@ -2289,6 +2399,9 @@ export function getRoomZonesWithData(): RoomZoneWithData[] {
     avgCurrentTemp: wholeHouseAvgTemp,
     avgSetPoint: wholeHouseAvgSetPoint,
     activeThermostats: wholeHouseActiveThermostats,
+    totalMediaRooms: wholeHouseTotalMedia,
+    mediaRoomsOn: wholeHouseMediaOn,
+    activeMediaSource: wholeHouseActiveSource,
   };
   
   // Create area-based zones
@@ -2324,6 +2437,11 @@ export function getRoomZonesWithData(): RoomZoneWithData[] {
       rs.climateStatus !== null && rs.climateStatus.mode !== "off"
     ).length;
     
+    // Media stats
+    const zoneTotalMedia = zoneRooms.filter(rs => rs.mediaStatus !== null).length;
+    const zoneMediaOn = zoneRooms.filter(rs => rs.mediaStatus?.isPoweredOn).length;
+    const zoneActiveSource = zoneRooms.find(rs => rs.mediaStatus?.isPoweredOn && rs.mediaStatus?.currentSourceName)?.mediaStatus?.currentSourceName || null;
+    
     return {
       zone: {
         id: area.id,
@@ -2337,6 +2455,9 @@ export function getRoomZonesWithData(): RoomZoneWithData[] {
       avgCurrentTemp: zoneAvgTemp,
       avgSetPoint: zoneAvgSetPoint,
       activeThermostats: zoneActiveThermostats,
+      totalMediaRooms: zoneTotalMedia,
+      mediaRoomsOn: zoneMediaOn,
+      activeMediaSource: zoneActiveSource,
     };
   }).filter(zone => zone.rooms.length > 0); // Only include zones with rooms
   
