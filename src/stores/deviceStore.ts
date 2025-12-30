@@ -463,6 +463,21 @@ export async function fetchAllDevices() {
   }
 }
 
+// Fetch media rooms only
+export async function fetchMediaRooms() {
+  const { setMediaRooms, setError } = useDeviceStore.getState();
+  try {
+    const data = await fetchWithAuth("devices");
+    if (data.success && data.data?.mediaRooms) {
+      setMediaRooms(data.data.mediaRooms);
+    } else {
+      setError(data.error);
+    }
+  } catch (error) {
+    setError(error instanceof Error ? error.message : "Failed to fetch media rooms");
+  }
+}
+
 // Fetch lights
 export async function fetchLights() {
   const { setLights, setError } = useDeviceStore.getState();
@@ -1254,14 +1269,64 @@ export async function setMediaRoomPower(id: string, powerState: "on" | "off") {
   });
   
   try {
+    // For power ON: Crestron requires selecting a source to power on the room
+    // The selectsource API call both sets the source AND powers on the room
+    if (powerState === "on") {
+      // Fetch the room data to get the current source index
+      const roomResponse = await fetch(`/api/crestron/media?roomId=${id}`, {
+        method: "GET",
+        headers,
+      });
+      const roomData = await roomResponse.json();
+      
+      if (!roomData.success || !roomData.data) {
+        await fetchMediaRooms();
+        return false;
+      }
+      
+      // Get the current source index (or default to 0)
+      const rawRoom = roomData.data;
+      const sourceIndex = rawRoom.currentProviderId ?? 0;
+      
+      // Select the source - this also powers on the room
+      const sourceResponse = await fetch("/api/crestron/media", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "source", sourceIndex }),
+      });
+      const sourceData = await sourceResponse.json();
+      
+      if (!sourceData.success) {
+        await fetchMediaRooms();
+        return false;
+      }
+      
+      // Selecting a source powers on the room automatically
+      // Don't refresh immediately - Crestron is slow to update its state
+      // The optimistic update shows the correct state, next poll will sync
+      return true;
+    }
+    
+    // For power OFF: use the standard power endpoint directly
     const response = await fetch("/api/crestron/media", {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ id, action: "power", powerState }),
     });
     const data = await response.json();
+    
+    // Refresh media room data from server to get actual state
+    if (data.success) {
+      await fetchMediaRooms();
+    } else {
+      // On failure, revert optimistic update by refreshing
+      await fetchMediaRooms();
+    }
+    
     return data.success;
   } catch {
+    // On error, revert optimistic update by refreshing
+    await fetchMediaRooms();
     return false;
   }
 }
@@ -1286,8 +1351,15 @@ export async function setMediaRoomVolume(id: string, volumePercent: number) {
       body: JSON.stringify({ id, action: "volume", volumePercent: clampedVolume }),
     });
     const data = await response.json();
+    
+    // Refresh media room data to ensure volume matches actual device state
+    if (data.success) {
+      await fetchMediaRooms();
+    }
+    
     return data.success;
   } catch {
+    await fetchMediaRooms();
     return false;
   }
 }
@@ -1309,8 +1381,15 @@ export async function setMediaRoomMute(id: string, muted: boolean) {
       body: JSON.stringify({ id, action: "mute", muted }),
     });
     const data = await response.json();
+    
+    // Refresh media room data to ensure mute state matches actual device state
+    if (data.success) {
+      await fetchMediaRooms();
+    }
+    
     return data.success;
   } catch {
+    await fetchMediaRooms();
     return false;
   }
 }
@@ -1336,8 +1415,15 @@ export async function selectMediaRoomSource(id: string, sourceIndex: number) {
       body: JSON.stringify({ id, action: "source", sourceIndex }),
     });
     const data = await response.json();
+    
+    // Refresh media room data to ensure source matches actual device state
+    if (data.success) {
+      await fetchMediaRooms();
+    }
+    
     return data.success;
   } catch {
+    await fetchMediaRooms();
     return false;
   }
 }

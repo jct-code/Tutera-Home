@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { motion } from "framer-motion";
 import {
   Lightbulb,
   ChevronDown,
@@ -8,9 +9,36 @@ import {
   Building2,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { LightCard, LightGroupControl } from "@/components/devices/LightCard";
+import { LightCard, levelToPercent, percentToLevel } from "@/components/devices/LightCard";
 import { LightingRoomGroup } from "@/components/devices/LightingRoomGroup";
+import { setLightState } from "@/stores/deviceStore";
 import type { LightingZoneWithData } from "@/stores/deviceStore";
+
+// Helper to get/set last brightness level from localStorage
+const LAST_BRIGHTNESS_KEY = "tutera-last-brightness";
+function getLastBrightness(lightId: string): number | null {
+  try {
+    const stored = localStorage.getItem(LAST_BRIGHTNESS_KEY);
+    if (stored) {
+      const data = JSON.parse(stored);
+      return data[lightId] || null;
+    }
+  } catch {
+    // Ignore errors
+  }
+  return null;
+}
+
+function setLastBrightness(lightId: string, brightness: number): void {
+  try {
+    const stored = localStorage.getItem(LAST_BRIGHTNESS_KEY);
+    const data = stored ? JSON.parse(stored) : {};
+    data[lightId] = brightness;
+    localStorage.setItem(LAST_BRIGHTNESS_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore errors
+  }
+}
 
 interface LightingZoneControlProps {
   zoneData: LightingZoneWithData;
@@ -28,8 +56,24 @@ export function LightingZoneControl({
   // Track which rooms are expanded within this zone
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
   
+  // Slider state for collapsed view
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPercent, setDragPercent] = useState<number | null>(null);
+  const [startX, setStartX] = useState(0);
+  const sliderRef = useRef<HTMLDivElement>(null);
+  
   const lightsOff = totalLights - lightsOn;
   const onPercentage = totalLights > 0 ? Math.round((lightsOn / totalLights) * 100) : 0;
+  
+  // Calculate average brightness for slider
+  const avgPercent = useMemo(() => {
+    if (totalLights === 0) return 0;
+    const totalLevel = lights.reduce((sum, l) => sum + l.level, 0);
+    return levelToPercent(Math.round(totalLevel / totalLights));
+  }, [lights, totalLights]);
+  
+  const isOn = lightsOn > 0;
   
   // Use roomGroups if available, otherwise fall back to grouping lights by roomId
   const displayRoomGroups = roomGroups && roomGroups.length > 0 
@@ -66,19 +110,147 @@ export function LightingZoneControl({
     setExpandedRooms(newExpanded);
   };
 
+  // Handle all lights brightness change (for slider)
+  const handleAllLights = useCallback(async (targetPercent: number) => {
+    setIsUpdating(true);
+    const targetLevel = percentToLevel(targetPercent);
+    const turnOn = targetPercent > 0;
+    
+    for (const light of lights) {
+      await setLightState(light.id, targetLevel, turnOn);
+    }
+    setIsUpdating(false);
+  }, [lights]);
+
+  // Calculate percentage from absolute position within the slider
+  const calculatePercentFromPosition = useCallback((clientX: number): number => {
+    const slider = sliderRef.current;
+    if (!slider) return avgPercent;
+    
+    const rect = slider.getBoundingClientRect();
+    const relativeX = clientX - rect.left;
+    const percent = (relativeX / rect.width) * 100;
+    return Math.max(0, Math.min(100, Math.round(percent)));
+  }, [avgPercent]);
+
+  // Slider pointer event handlers
+  const handleSliderPointerDown = useCallback((e: React.PointerEvent) => {
+    if (isUpdating) return;
+    e.stopPropagation(); // Prevent card expansion when clicking slider
+    setIsDragging(true);
+    setStartX(e.clientX);
+    // Immediately calculate percent from click position for instant feedback
+    const clickPercent = calculatePercentFromPosition(e.clientX);
+    setDragPercent(clickPercent);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [isUpdating, calculatePercentFromPosition]);
+
+  const handleSliderPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging || isUpdating) return;
+    
+    // Calculate percent from absolute position for smooth sliding
+    const newPercent = calculatePercentFromPosition(e.clientX);
+    setDragPercent(newPercent);
+  }, [isDragging, isUpdating, calculatePercentFromPosition]);
+
+  const handleSliderPointerUp = useCallback(async (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    // Use the dragPercent value directly (updated during drag)
+    let finalPercent = dragPercent;
+    if (finalPercent === null) {
+      finalPercent = calculatePercentFromPosition(e.clientX);
+    }
+    
+    await handleAllLights(Math.max(0, Math.min(100, finalPercent)));
+    
+    setIsDragging(false);
+    setDragPercent(null);
+  }, [isDragging, dragPercent, calculatePercentFromPosition, handleAllLights]);
+
+  const displayPercent = isDragging && dragPercent !== null ? dragPercent : avgPercent;
+  const bgFillPercent = isDragging && dragPercent !== null ? dragPercent : (isOn ? avgPercent : 0);
+
+  // Handle zone toggle - save/restore individual light brightness levels
+  const handleZoneToggle = useCallback(async (e?: React.MouseEvent | React.PointerEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (isUpdating || lights.length === 0) return;
+    
+    setIsUpdating(true);
+    
+    try {
+      if (isOn) {
+        // Turning off: save each light's current brightness
+        const promises = lights.map(async (light) => {
+          const percent = levelToPercent(light.level);
+          if (percent > 0) {
+            setLastBrightness(light.id, percent);
+          }
+          return setLightState(light.id, 0, false);
+        });
+        await Promise.all(promises);
+      } else {
+        // Turning on: restore each light to its last brightness (or 75% default)
+        const promises = lights.map(async (light) => {
+          const lastBrightness = getLastBrightness(light.id);
+          const targetPercent = lastBrightness !== null ? lastBrightness : 75;
+          const targetLevel = percentToLevel(targetPercent);
+          return setLightState(light.id, targetLevel, true);
+        });
+        await Promise.all(promises);
+      }
+    } catch (error) {
+      console.error('Error toggling zone lights:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [isOn, lights, isUpdating]);
+
+  // Handle icon click toggle
+  const handleIconClick = useCallback(async (e: React.MouseEvent | React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isUpdating || lights.length === 0) return;
+    await handleZoneToggle(e);
+  }, [handleZoneToggle, isUpdating, lights.length]);
+
+  // Handle pointer events on icon to prevent expand/collapse
+  const handleIconPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+  }, []);
+
   return (
     <Card padding="lg" className="overflow-hidden">
       {/* Zone Header - Clickable to expand/collapse */}
-      <button
-        onClick={onToggleExpand}
-        className="w-full flex items-center justify-between text-left"
-      >
+      <div className="w-full flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
-            <Lightbulb className="w-7 h-7 text-yellow-500" />
-          </div>
+          <motion.button
+            type="button"
+            onClick={handleIconClick}
+            onPointerDown={handleIconPointerDown}
+            disabled={isUpdating || lights.length === 0}
+            animate={{
+              backgroundColor: isOn
+                ? `rgba(252,211,77,${0.5 + (bgFillPercent / 100) * 0.5})` 
+                : "rgba(252,211,77,0.2)",
+              scale: isOn ? 1 : 0.95,
+            }}
+            transition={{ duration: 0.2 }}
+            className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed relative z-10"
+            title={isOn ? "Click to turn off" : "Click to turn on"}
+            style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
+          >
+            <Lightbulb className={`w-7 h-7 transition-colors duration-200 ${isOn ? "text-yellow-700" : "text-yellow-600"}`} strokeWidth={2.5} stroke={isOn ? "rgb(161, 98, 7)" : "rgb(161, 98, 7)"} fill="none" />
+          </motion.button>
           
-          <div className="flex-1">
+          <button
+            onClick={onToggleExpand}
+            className="flex-1 text-left"
+          >
             <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">
               {zone.name}
             </h3>
@@ -97,7 +269,7 @@ export function LightingZoneControl({
                 </div>
               )}
             </div>
-          </div>
+          </button>
         </div>
         
         <div className="flex items-center gap-4">
@@ -113,23 +285,146 @@ export function LightingZoneControl({
           
           {/* Expand/Collapse Icon */}
           {onToggleExpand && (
-            <div className="p-2 rounded-lg hover:bg-[var(--surface-hover)] transition-colors">
+            <button
+              onClick={onToggleExpand}
+              className="p-2 rounded-lg hover:bg-[var(--surface-hover)] transition-colors"
+            >
               {expanded ? (
                 <ChevronDown className="w-5 h-5 text-[var(--text-secondary)]" />
               ) : (
                 <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
               )}
-            </div>
+            </button>
           )}
         </div>
-      </button>
+      </div>
+
+      {/* Collapsed View Slider */}
+      {!expanded && lights.length > 0 && (
+        <div 
+          ref={sliderRef}
+          onPointerDown={handleSliderPointerDown}
+          onPointerMove={handleSliderPointerMove}
+          onPointerUp={handleSliderPointerUp}
+          onPointerCancel={handleSliderPointerUp}
+          role="slider"
+          aria-label={`${zone.name} lights control. ${lightsOn} of ${totalLights} on at ${avgPercent}% average brightness. Slide to adjust.`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={avgPercent}
+          aria-valuetext={`${avgPercent}% brightness`}
+          tabIndex={0}
+          className={`
+            relative overflow-hidden rounded-[var(--radius)] cursor-ew-resize
+            transition-shadow duration-300 select-none touch-none
+            border border-[var(--border-light)] bg-[var(--surface)]
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
+            ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}
+            ${isUpdating ? "opacity-70 pointer-events-none" : ""}
+            mt-4
+          `}
+        >
+          {/* Dynamic background gradient fill */}
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            animate={{
+              background: `linear-gradient(90deg, 
+                rgba(255,255,255,0.95) 0%, 
+                rgba(252,211,77,${0.2 + (bgFillPercent / 100) * 0.4}) ${bgFillPercent}%, 
+                rgba(245,158,11,${0.15 + (bgFillPercent / 100) * 0.4}) ${bgFillPercent}%, 
+                rgba(255,255,255,0.95) ${bgFillPercent + 2}%
+              )`,
+            }}
+            transition={{ duration: isDragging ? 0.05 : 0.3 }}
+          />
+          
+          {/* Content */}
+          <div className="relative p-2">
+            <div className="flex items-center gap-3">
+              {/* Slider bar */}
+              <div className="flex-1 h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    background: "linear-gradient(90deg, var(--light-color), var(--light-color-warm))",
+                  }}
+                  animate={{ width: `${displayPercent}%` }}
+                  transition={{ duration: isDragging ? 0.05 : 0.3 }}
+                />
+              </div>
+              
+              {/* Percentage display on the right */}
+              <span className={`text-sm font-medium tabular-nums transition-colors shrink-0 ${isDragging ? "text-[var(--light-color-warm)]" : "text-[var(--text-tertiary)]"}`}>
+                {displayPercent}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Expanded Content */}
       {expanded && lights.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-[var(--border-light)]">
-          {/* Zone Group Control */}
+        <div className="mt-4 border-t border-[var(--border-light)] pt-2">
+          {/* Zone Group Control - Compact Slider */}
           <div className="mb-6">
-            <LightGroupControl lights={lights} roomName={zone.name} standalone={true} />
+            <div 
+              ref={sliderRef}
+              onPointerDown={handleSliderPointerDown}
+              onPointerMove={handleSliderPointerMove}
+              onPointerUp={handleSliderPointerUp}
+              onPointerCancel={handleSliderPointerUp}
+              role="slider"
+              aria-label={`${zone.name} lights control. ${lightsOn} of ${totalLights} on at ${avgPercent}% average brightness. Slide to adjust.`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={avgPercent}
+              aria-valuetext={`${avgPercent}% brightness`}
+              tabIndex={0}
+              className={`
+                relative overflow-hidden rounded-[var(--radius)] cursor-ew-resize
+                transition-shadow duration-300 select-none touch-none
+                border border-[var(--border-light)] bg-[var(--surface)]
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
+                ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}
+                ${isUpdating ? "opacity-70 pointer-events-none" : ""}
+              `}
+            >
+              {/* Dynamic background gradient fill */}
+              <motion.div
+                className="absolute inset-0 pointer-events-none"
+                animate={{
+                  background: `linear-gradient(90deg, 
+                    rgba(255,255,255,0.95) 0%, 
+                    rgba(252,211,77,${0.2 + (bgFillPercent / 100) * 0.4}) ${bgFillPercent}%, 
+                    rgba(245,158,11,${0.15 + (bgFillPercent / 100) * 0.4}) ${bgFillPercent}%, 
+                    rgba(255,255,255,0.95) ${bgFillPercent + 2}%
+                  )`,
+                }}
+                transition={{ duration: isDragging ? 0.05 : 0.3 }}
+              />
+              
+              {/* Content */}
+              <div className="relative p-2">
+                <div className="flex items-center gap-3">
+                  {/* Slider bar */}
+                  <div className="flex-1 h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{
+                        background: "linear-gradient(90deg, var(--light-color), var(--light-color-warm))",
+                      }}
+                      animate={{ width: `${displayPercent}%` }}
+                      transition={{ duration: isDragging ? 0.05 : 0.3 }}
+                    />
+                  </div>
+                  
+                  {/* Percentage display on the right */}
+                  <span className={`text-sm font-medium tabular-nums transition-colors shrink-0 ${isDragging ? "text-[var(--light-color-warm)]" : "text-[var(--text-tertiary)]"}`}>
+                    {displayPercent}%
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
           
           {/* Room Groups */}

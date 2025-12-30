@@ -191,10 +191,15 @@ interface CrestronMediaRoom {
   name: string;
   roomId?: number;
   currentVolumeLevel: number;           // 0-65535 or percentage depending on system
-  currentMuteState: "Muted" | "Unmuted";
-  currentPowerState: "On" | "Off";
+  currentMuteState: "Muted" | "Unmuted" | "unmuted" | "muted";
+  currentPowerState: "On" | "Off" | "on" | "off";
   currentProviderId?: number;
-  availableProviders: string[];
+  currentSourceId?: number;             // Index into availableSources array (new format)
+  availableProviders?: string[];        // Array of strings (old format)
+  availableSources?: Array<{            // Array of objects (new format)
+    id: number;
+    sourceName: string;
+  }>;
   availableVolumeControls: string[];    // ["discrete"] or ["none"]
   availableMuteControls: string[];      // ["discrete"] or ["none"]
 }
@@ -208,9 +213,30 @@ function transformMediaRoom(m: CrestronMediaRoom) {
     ? Math.round((rawVolume / 65535) * 100) 
     : rawVolume;
   
+  // Normalize power/mute state (handle lowercase variants)
+  const normalizedPowerState = (m.currentPowerState || "Off").charAt(0).toUpperCase() + (m.currentPowerState || "Off").slice(1).toLowerCase() as "On" | "Off";
+  const normalizedMuteState = (m.currentMuteState || "Unmuted").charAt(0).toUpperCase() + (m.currentMuteState || "Unmuted").slice(1).toLowerCase() as "Muted" | "Unmuted";
+  
+  // Handle both availableSources (array of objects) and availableProviders (array of strings)
+  let availableProviders: string[] = [];
+  let currentProviderId: number | undefined = undefined;
+  
+  if (m.availableSources && Array.isArray(m.availableSources) && m.availableSources.length > 0) {
+    // New format: extract sourceName from each object
+    availableProviders = m.availableSources.map(s => s.sourceName);
+    // currentSourceId is the index into availableSources array
+    if (m.currentSourceId !== undefined && m.currentSourceId >= 0 && m.currentSourceId < availableProviders.length) {
+      currentProviderId = m.currentSourceId;
+    }
+  } else if (m.availableProviders && Array.isArray(m.availableProviders)) {
+    // Old format: already an array of strings
+    availableProviders = m.availableProviders;
+    currentProviderId = m.currentProviderId;
+  }
+  
   // Resolve current source name from provider ID
-  const currentSourceName = m.currentProviderId !== undefined && m.availableProviders?.length > 0
-    ? m.availableProviders[m.currentProviderId] || undefined
+  const currentSourceName = currentProviderId !== undefined && availableProviders.length > 0
+    ? availableProviders[currentProviderId] || undefined
     : undefined;
   
   return {
@@ -220,15 +246,15 @@ function transformMediaRoom(m: CrestronMediaRoom) {
     roomId: m.roomId ? String(m.roomId) : undefined,
     // Raw values from Crestron
     currentVolumeLevel: rawVolume,
-    currentMuteState: m.currentMuteState || "Unmuted",
-    currentPowerState: m.currentPowerState || "Off",
-    currentProviderId: m.currentProviderId,
-    availableProviders: m.availableProviders || [],
+    currentMuteState: normalizedMuteState,
+    currentPowerState: normalizedPowerState,
+    currentProviderId: currentProviderId,
+    availableProviders: availableProviders,
     availableVolumeControls: m.availableVolumeControls || ["none"],
     availableMuteControls: m.availableMuteControls || ["none"],
     // Computed values for UI
-    isPoweredOn: m.currentPowerState === "On",
-    isMuted: m.currentMuteState === "Muted",
+    isPoweredOn: normalizedPowerState === "On",
+    isMuted: normalizedMuteState === "Muted",
     volumePercent,
     currentSourceName,
   };

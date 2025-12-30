@@ -30,7 +30,7 @@ export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoo
   const [isUpdating, setIsUpdating] = useState(false);
   const [showSourcePicker, setShowSourcePicker] = useState(false);
   
-  // Use a ref to always access the latest data in callbacks
+  // Use a ref to always access the latest data in callbacks for other operations
   const mediaRoomRef = useRef(mediaRoom);
   useEffect(() => {
     mediaRoomRef.current = mediaRoom;
@@ -44,11 +44,18 @@ export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoo
   const displayName = roomName || mediaRoom.name;
   
   const handlePowerToggle = useCallback(async () => {
+    if (isUpdating) return;
     setIsUpdating(true);
-    const newPowerState = mediaRoomRef.current.isPoweredOn ? "off" : "on";
-    await setMediaRoomPower(mediaRoomRef.current.id, newPowerState);
-    setIsUpdating(false);
-  }, []);
+    try {
+      // Use the current mediaRoom prop directly to ensure we have the latest state
+      // This prevents using stale state that might cause incorrect toggles
+      const currentState = mediaRoom.isPoweredOn;
+      const newPowerState = currentState ? "off" : "on";
+      await setMediaRoomPower(mediaRoom.id, newPowerState);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [mediaRoom.id, mediaRoom.isPoweredOn, isUpdating]);
   
   const handleVolumeChange = useCallback(async (value: number[]) => {
     // Don't send API call during drag, just update UI
@@ -145,6 +152,39 @@ export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoo
             )}
           </div>
         </div>
+        
+        {/* Source selector - show when OFF and has sources */}
+        {!mediaRoom.isPoweredOn && hasSources && (
+          <div className="mt-3 pt-3 border-t border-[var(--border)]">
+            <p className="text-[10px] font-medium text-[var(--text-tertiary)] mb-2 uppercase tracking-wide">
+              Select source to power on
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {mediaRoom.availableProviders.slice(0, 6).map((source, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSourceSelect(index)}
+                  disabled={isUpdating}
+                  className={`
+                    px-2.5 py-1 text-xs rounded-lg transition-all
+                    ${index === 0 
+                      ? "bg-purple-500 text-white" 
+                      : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-purple-500/20 hover:text-purple-400"
+                    }
+                    ${isUpdating ? "opacity-50" : ""}
+                  `}
+                >
+                  {source}
+                </button>
+              ))}
+              {mediaRoom.availableProviders.length > 6 && (
+                <span className="px-2 py-1 text-xs text-[var(--text-tertiary)]">
+                  +{mediaRoom.availableProviders.length - 6} more
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
     );
   }
@@ -206,66 +246,76 @@ export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoo
         </button>
       </div>
 
+      {/* Source Selector - ALWAYS show when sources available (even when off) */}
+      {mediaRoom.availableProviders.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-medium text-[var(--text-secondary)] mb-2">
+            {mediaRoom.isPoweredOn ? "SOURCE" : "SELECT SOURCE TO POWER ON"}
+          </p>
+          <div className="relative">
+            <button
+              onClick={() => setShowSourcePicker(!showSourcePicker)}
+              disabled={isUpdating}
+              className={`
+                w-full flex items-center justify-between
+                px-4 py-3 rounded-xl
+                transition-colors
+                text-left
+                ${mediaRoom.isPoweredOn 
+                  ? "bg-[var(--surface)] hover:bg-[var(--surface-hover)]"
+                  : "bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30"
+                }
+              `}
+            >
+              <span className={`text-sm font-medium ${mediaRoom.isPoweredOn ? "text-[var(--text-primary)]" : "text-purple-400"}`}>
+                {mediaRoom.currentSourceName || mediaRoom.availableProviders[0] || "Select Source"}
+              </span>
+              <ChevronDown className={`
+                w-4 h-4 ${mediaRoom.isPoweredOn ? "text-[var(--text-tertiary)]" : "text-purple-400"}
+                transition-transform duration-200
+                ${showSourcePicker ? "rotate-180" : ""}
+              `} />
+            </button>
+            
+            {/* Source Dropdown */}
+            {showSourcePicker && (
+              <div className="
+                absolute top-full left-0 right-0 mt-1 z-10
+                bg-[var(--surface)] rounded-xl shadow-lg border border-[var(--border)]
+                max-h-48 overflow-y-auto
+              ">
+                {mediaRoom.availableProviders.map((source, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSourceSelect(index)}
+                    className={`
+                      w-full px-4 py-2.5 text-left text-sm
+                      hover:bg-[var(--surface-hover)] transition-colors
+                      ${mediaRoom.currentProviderId === index 
+                        ? "bg-purple-500/10 text-purple-500 font-medium" 
+                        : "text-[var(--text-primary)]"
+                      }
+                      ${index === 0 ? "rounded-t-xl" : ""}
+                      ${index === mediaRoom.availableProviders.length - 1 ? "rounded-b-xl" : ""}
+                    `}
+                  >
+                    {source}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {!mediaRoom.isPoweredOn && (
+            <p className="text-xs text-purple-400/70 mt-2 italic">
+              Selecting a source will set it as default and power on the room
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Controls - only show when powered on */}
       {mediaRoom.isPoweredOn && (
-        <div className="mt-6 space-y-4">
-          {/* Source Selector */}
-          {mediaRoom.availableProviders.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-[var(--text-secondary)] mb-2">SOURCE</p>
-              <div className="relative">
-                <button
-                  onClick={() => setShowSourcePicker(!showSourcePicker)}
-                  disabled={isUpdating}
-                  className="
-                    w-full flex items-center justify-between
-                    px-4 py-3 rounded-xl
-                    bg-[var(--surface)] hover:bg-[var(--surface-hover)]
-                    transition-colors
-                    text-left
-                  "
-                >
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
-                    {mediaRoom.currentSourceName || "Select Source"}
-                  </span>
-                  <ChevronDown className={`
-                    w-4 h-4 text-[var(--text-tertiary)]
-                    transition-transform duration-200
-                    ${showSourcePicker ? "rotate-180" : ""}
-                  `} />
-                </button>
-                
-                {/* Source Dropdown */}
-                {showSourcePicker && (
-                  <div className="
-                    absolute top-full left-0 right-0 mt-1 z-10
-                    bg-[var(--surface)] rounded-xl shadow-lg border border-[var(--border)]
-                    max-h-48 overflow-y-auto
-                  ">
-                    {mediaRoom.availableProviders.map((source, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSourceSelect(index)}
-                        className={`
-                          w-full px-4 py-2.5 text-left text-sm
-                          hover:bg-[var(--surface-hover)] transition-colors
-                          ${mediaRoom.currentProviderId === index 
-                            ? "bg-purple-500/10 text-purple-500 font-medium" 
-                            : "text-[var(--text-primary)]"
-                          }
-                          ${index === 0 ? "rounded-t-xl" : ""}
-                          ${index === mediaRoom.availableProviders.length - 1 ? "rounded-b-xl" : ""}
-                        `}
-                      >
-                        {source}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
+        <div className="mt-4 space-y-4">
           {/* Volume Slider - always shown when powered on */}
           <div className={!canControlVolume ? "opacity-60" : ""}>
             <div className="flex items-center justify-between mb-2">
