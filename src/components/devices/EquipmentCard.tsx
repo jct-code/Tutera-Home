@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Fan, Flame, Waves, Droplets, Power } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import type { Light } from "@/lib/crestron/types";
-import { setLightState } from "@/stores/deviceStore";
+import { setLightState, useDeviceStore } from "@/stores/deviceStore";
 
 interface EquipmentCardProps {
   equipment: Light;
@@ -36,7 +36,16 @@ function getEquipmentColor(name: string): string {
 export function EquipmentCard({ equipment, compact = false, roomName }: EquipmentCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   
-  const isOn = equipment.isOn || equipment.level > 0;
+  // Subscribe to the store directly to get the latest equipment state
+  // This ensures updates are reflected immediately regardless of parent re-renders
+  const storeLight = useDeviceStore(
+    (state) => state.lights.find((l) => l.id === equipment.id)
+  );
+  
+  // Use store light if available, otherwise fall back to prop
+  const currentEquipment = storeLight || equipment;
+  
+  const isOn = currentEquipment.isOn || currentEquipment.level > 0;
   const Icon = getEquipmentIcon(equipment.name);
   const accentColor = getEquipmentColor(equipment.name);
 
@@ -44,12 +53,12 @@ export function EquipmentCard({ equipment, compact = false, roomName }: Equipmen
     if (isUpdating) return;
     setIsUpdating(true);
     if (isOn) {
-      await setLightState(equipment.id, 0, false);
+      await setLightState(currentEquipment.id, 0, false);
     } else {
-      await setLightState(equipment.id, 65535, true);
+      await setLightState(currentEquipment.id, 65535, true);
     }
     setIsUpdating(false);
-  }, [equipment.id, isUpdating, isOn]);
+  }, [currentEquipment.id, isUpdating, isOn]);
 
   if (compact) {
     return (

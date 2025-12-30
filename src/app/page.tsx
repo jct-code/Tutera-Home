@@ -22,7 +22,6 @@ import { BottomNavigation } from "@/components/layout/Navigation";
 import { Card } from "@/components/ui/Card";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { LightCard, LightGroupControl } from "@/components/devices/LightCard";
-import { LightsByRoom } from "@/components/devices/LightsByRoom";
 import { ShadeCard } from "@/components/devices/ShadeCard";
 import { ThermostatCard } from "@/components/devices/ThermostatCard";
 import { SceneGrid } from "@/components/devices/SceneCard";
@@ -379,73 +378,41 @@ export default function Dashboard() {
               </motion.section>
             )}
 
-            {/* Media / Audio */}
+            {/* Media */}
             {mediaRooms.length > 0 && (
               <motion.section variants={itemVariants}>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                    Audio
-                  </h2>
-                  <Link
-                    href="/media"
-                    className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1"
-                  >
-                    View all <ChevronRight className="w-4 h-4" />
-                  </Link>
-                </div>
-                {/* Show playing rooms or first room */}
-                {mediaRoomsPlaying > 0 ? (
-                  <div className="space-y-2">
-                    {mediaRooms
-                      .filter(m => m.isPoweredOn)
-                      .slice(0, 2)
-                      .map((mediaRoom) => (
-                        <MediaRoomCard
-                          key={mediaRoom.id}
-                          mediaRoom={mediaRoom}
-                          roomName={getRoomName(mediaRoom.roomId)}
-                          compact
-                        />
-                      ))
-                    }
-                    {mediaRoomsPlaying > 2 && (
-                      <Link
-                        href="/media"
-                        className="block text-center py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
-                      >
-                        +{mediaRoomsPlaying - 2} more playing
-                      </Link>
-                    )}
-                  </div>
-                ) : (
-                  <Card padding="md" className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                      <Music className="w-5 h-5 text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-[var(--text-primary)]">{mediaRooms.length} Audio Rooms</p>
-                      <p className="text-sm text-[var(--text-secondary)]">All off</p>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">
+                  Media
+                </h2>
+                <Link href="/media">
+                  <Card padding="md" className="hover:bg-[var(--surface-hover)] transition-colors cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-500/20 flex items-center justify-center">
+                        <Music className="w-5 h-5 text-slate-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-[var(--text-primary)]">{mediaRooms.length} Media Rooms</p>
+                        <p className="text-sm text-[var(--text-secondary)]">
+                          {mediaRoomsPlaying > 0 ? `${mediaRoomsPlaying} playing` : "All off"}
+                        </p>
+                      </div>
                     </div>
                   </Card>
-                )}
+                </Link>
               </motion.section>
             )}
 
             {/* Climate */}
             {thermostats.length > 0 && (
               <motion.section variants={itemVariants}>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                    Climate
-                  </h2>
-                  <Link
-                    href="/climate"
-                    className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1"
-                  >
-                    View all <ChevronRight className="w-4 h-4" />
-                  </Link>
-                </div>
-                <ThermostatCard thermostat={thermostats[0]} compact />
+                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">
+                  Climate
+                </h2>
+                <Link href="/climate">
+                  <div className="hover:opacity-90 transition-opacity cursor-pointer">
+                    <ThermostatCard thermostat={thermostats[0]} compact />
+                  </div>
+                </Link>
               </motion.section>
             )}
 
@@ -467,21 +434,33 @@ export default function Dashboard() {
             animate="show"
             className="lg:col-span-2 space-y-6"
           >
-            {/* Lights */}
+            {/* Lighting */}
             {filteredLights.length > 0 && (
               <motion.section variants={itemVariants} initial="show" animate="show">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                    Lights
-                  </h2>
-                </div>
-                {/* Show grouped by room when "All Rooms" is selected */}
-                <LightsByRoom 
-                  lights={lights} 
-                  rooms={rooms}
-                  maxLightsPerRoom={4}
-                  showUnassigned
-                />
+                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">
+                  Lighting
+                </h2>
+                {/* Clickable summary card that links to Lighting page */}
+                <Link href="/lighting">
+                  <Card padding="md" className="bg-[var(--surface)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--light-color)]/20 flex items-center justify-center">
+                          <Lightbulb className="w-5 h-5 text-[var(--light-color)]" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-[var(--text-primary)]">
+                            {filteredLights.filter(l => l.isOn || l.level > 0).length} of {filteredLights.length} lights on
+                          </p>
+                          <p className="text-xs text-[var(--text-secondary)]">
+                            {new Set(filteredLights.filter(l => l.roomId).map(l => l.roomId)).size} rooms • {filteredLights.filter(l => l.roomId).length} assigned
+                          </p>
+                        </div>
+                      </div>
+                      <LightGroupControl lights={filteredLights} standalone={false} />
+                    </div>
+                  </Card>
+                </Link>
               </motion.section>
             )}
 

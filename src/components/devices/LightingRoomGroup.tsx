@@ -3,9 +3,10 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { LightCard, LightGroupControl, levelToPercent, percentToLevel } from "@/components/devices/LightCard";
+import { EquipmentCard } from "@/components/devices/EquipmentCard";
 import type { LightingRoomGroup } from "@/stores/deviceStore";
 import { setLightState } from "@/stores/deviceStore";
-import { Building2, Lightbulb, ChevronDown, ChevronRight } from "lucide-react";
+import { Building2, Lightbulb, ChevronDown, ChevronRight, Power } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Helper to get/set last brightness level from localStorage
@@ -45,7 +46,7 @@ export function LightingRoomGroup({
   expanded = false, 
   onToggleExpand 
 }: LightingRoomGroupComponentProps) {
-  const { roomName, lights, lightsOn, totalLights, avgBrightness } = group;
+  const { roomName, lights, lightsOn, totalLights, avgBrightness, equipment } = group;
   
   const lightsOff = totalLights - lightsOn;
   const isOn = lightsOn > 0;
@@ -332,7 +333,7 @@ export function LightingRoomGroup({
 
       {/* Expanded Content - Only show when expanded */}
       <AnimatePresence>
-        {expanded && lights.length > 0 && (
+        {expanded && (lights.length > 0 || equipment.length > 0) && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -340,16 +341,35 @@ export function LightingRoomGroup({
             className="mt-6 pt-6 border-t border-[var(--border-light)]"
           >
             {/* Individual Lights */}
-            <div>
-              <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">
-                Individual Lights
-              </h4>
-              <div className="grid grid-cols-1 gap-3">
-                {lights.map((light) => (
-                  <LightCard key={light.id} light={light} compact />
-                ))}
+            {lights.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">
+                  Individual Lights
+                </h4>
+                <div className="grid grid-cols-1 gap-3">
+                  {lights.map((light) => (
+                    <LightCard key={light.id} light={light} compact />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+            
+            {/* Equipment Section */}
+            {equipment.length > 0 && (
+              <div className={lights.length > 0 ? "mt-6" : ""}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Power className="w-4 h-4 text-[var(--accent)]" />
+                  <h4 className="text-sm font-medium text-[var(--text-secondary)]">
+                    Equipment
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  {equipment.map((equip) => (
+                    <EquipmentCard key={equip.id} equipment={equip} compact />
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

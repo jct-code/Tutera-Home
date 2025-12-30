@@ -1817,14 +1817,15 @@ export interface LightingRoomGroup {
   lightsOn: number;
   totalLights: number;
   avgBrightness: number;
+  equipment: Light[];
 }
 
 // Get lighting zones grouped by area (similar to thermostat zones)
 export function getLightingZonesWithData(): LightingZoneWithData[] {
   const { lights, areas, rooms, virtualRooms } = useDeviceStore.getState();
   
-  // Filter out equipment controls
-  const { actualLights } = separateLightsAndEquipment(lights);
+  // Separate lights from equipment controls
+  const { actualLights, equipment } = separateLightsAndEquipment(lights);
   
   // Build a map of roomId to virtual room (if it exists)
   const roomToVirtualRoomMap = new Map<string, { id: string; name: string }>();
@@ -1842,9 +1843,20 @@ export function getLightingZonesWithData(): LightingZoneWithData[] {
     });
   });
   
+  // Build a map of roomId to equipment
+  const equipmentByRoom = new Map<string, Light[]>();
+  for (const equip of equipment) {
+    if (!equip.roomId) continue;
+    const virtualRoom = roomToVirtualRoomMap.get(equip.roomId);
+    const displayRoomId = virtualRoom ? virtualRoom.id : equip.roomId;
+    const existing = equipmentByRoom.get(displayRoomId) || [];
+    existing.push(equip);
+    equipmentByRoom.set(displayRoomId, existing);
+  }
+  
   // Helper function to group lights by room/virtual room
   const groupLightsByRoom = (lightsToGroup: Light[]): LightingRoomGroup[] => {
-    const roomGroups = new Map<string, { roomId: string; roomName: string; lights: Light[] }>();
+    const roomGroups = new Map<string, { roomId: string; roomName: string; lights: Light[]; equipment: Light[] }>();
     
     for (const light of lightsToGroup) {
       if (!light.roomId) continue;
@@ -1862,6 +1874,21 @@ export function getLightingZonesWithData(): LightingZoneWithData[] {
           roomId: displayRoomId,
           roomName: displayRoomName,
           lights: [light],
+          equipment: equipmentByRoom.get(displayRoomId) || [],
+        });
+      }
+    }
+    
+    // Also add rooms that only have equipment (no lights)
+    for (const [roomId, roomEquipment] of equipmentByRoom.entries()) {
+      if (!roomGroups.has(roomId)) {
+        const virtualRoom = roomToVirtualRoomMap.get(roomId);
+        const displayRoomName = virtualRoom ? virtualRoom.name : (rooms.find(r => r.id === roomId)?.name || `Room ${roomId}`);
+        roomGroups.set(roomId, {
+          roomId,
+          roomName: displayRoomName,
+          lights: [],
+          equipment: roomEquipment,
         });
       }
     }
@@ -1881,6 +1908,7 @@ export function getLightingZonesWithData(): LightingZoneWithData[] {
         lightsOn,
         totalLights: group.lights.length,
         avgBrightness,
+        equipment: group.equipment,
       });
     }
     
@@ -2016,8 +2044,8 @@ export function getLightingZonesWithData(): LightingZoneWithData[] {
 export function getLightingRoomGroups(): LightingRoomGroup[] {
   const { lights, rooms, areas, virtualRooms } = useDeviceStore.getState();
   
-  // Filter out equipment controls
-  const { actualLights } = separateLightsAndEquipment(lights);
+  // Separate lights from equipment controls
+  const { actualLights, equipment } = separateLightsAndEquipment(lights);
   
   // Build a map of roomId to virtual room (if it exists)
   const roomToVirtualRoomMap = new Map<string, { id: string; name: string }>();
@@ -2036,7 +2064,7 @@ export function getLightingRoomGroups(): LightingRoomGroup[] {
   });
   
   // Group lights by roomId (or virtual room if applicable)
-  const roomGroups = new Map<string, { roomId: string; roomName: string; lights: Light[] }>();
+  const roomGroups = new Map<string, { roomId: string; roomName: string; lights: Light[]; equipment: Light[] }>();
   
   for (const light of actualLights) {
     if (!light.roomId) continue;
@@ -2054,6 +2082,30 @@ export function getLightingRoomGroups(): LightingRoomGroup[] {
         roomId: displayRoomId,
         roomName: displayRoomName,
         lights: [light],
+        equipment: [],
+      });
+    }
+  }
+  
+  // Group equipment by roomId (or virtual room if applicable)
+  for (const equip of equipment) {
+    if (!equip.roomId) continue;
+    
+    // Check if this room is part of a virtual room
+    const virtualRoom = roomToVirtualRoomMap.get(equip.roomId);
+    const displayRoomId = virtualRoom ? virtualRoom.id : equip.roomId;
+    const displayRoomName = virtualRoom ? virtualRoom.name : (rooms.find(r => r.id === equip.roomId)?.name || `Room ${equip.roomId}`);
+    
+    const existing = roomGroups.get(displayRoomId);
+    if (existing) {
+      existing.equipment.push(equip);
+    } else {
+      // Create a new room group even if it only has equipment (no lights)
+      roomGroups.set(displayRoomId, {
+        roomId: displayRoomId,
+        roomName: displayRoomName,
+        lights: [],
+        equipment: [equip],
       });
     }
   }
@@ -2074,6 +2126,7 @@ export function getLightingRoomGroups(): LightingRoomGroup[] {
       lightsOn,
       totalLights: group.lights.length,
       avgBrightness,
+      equipment: group.equipment,
     });
   }
   
