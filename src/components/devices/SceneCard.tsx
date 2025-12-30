@@ -16,11 +16,12 @@ import {
   Lightbulb,
   Music,
   Zap,
+  Star,
   LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import type { Scene, SceneSource } from "@/lib/crestron/types";
-import { recallScene } from "@/stores/deviceStore";
+import { recallScene, useDeviceStore } from "@/stores/deviceStore";
 
 // Get display info for scene source with icons
 interface SourceInfo {
@@ -107,6 +108,11 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
   const color = getSceneColor(scene.name);
   const isActive = scene.isActive;
   const sourceInfo = getSourceInfo(scene.source);
+  
+  // Favorite state
+  const favoriteSceneIds = useDeviceStore((state) => state.favoriteSceneIds);
+  const toggleFavoriteScene = useDeviceStore((state) => state.toggleFavoriteScene);
+  const isFavorite = favoriteSceneIds.includes(scene.id);
 
   const handleActivate = useCallback(async () => {
     setIsActivating(true);
@@ -114,6 +120,12 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
     // Wait a moment before allowing another activation
     setTimeout(() => setIsActivating(false), 1000);
   }, [scene.id]);
+  
+  const handleToggleFavorite = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    toggleFavoriteScene(scene.id);
+  }, [scene.id, toggleFavoriteScene]);
 
   if (compact) {
     return (
@@ -172,6 +184,22 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
               </p>
             ) : null}
           </div>
+          
+          {/* Favorite button */}
+          <button
+            onClick={handleToggleFavorite}
+            className="p-1.5 rounded-lg hover:bg-[var(--surface-hover)] transition-colors"
+            title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Star 
+              className={`w-4 h-4 transition-colors ${
+                isFavorite 
+                  ? "text-amber-500 fill-amber-500" 
+                  : "text-[var(--text-tertiary)] hover:text-amber-400"
+              }`} 
+            />
+          </button>
+          
           {isActivating && (
             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" style={{ color }} />
           )}
@@ -216,13 +244,30 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
               <Icon className="w-7 h-7" style={{ color }} />
             </div>
             
-            {isActivating ? (
-              <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: color }} />
-            ) : (
-              <Play
-                className="w-5 h-5 text-[var(--text-tertiary)]"
-              />
-            )}
+            <div className="flex items-center gap-2">
+              {/* Favorite button */}
+              <button
+                onClick={handleToggleFavorite}
+                className="p-2 rounded-lg hover:bg-[var(--surface-hover)] transition-colors"
+                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+              >
+                <Star 
+                  className={`w-5 h-5 transition-colors ${
+                    isFavorite 
+                      ? "text-amber-500 fill-amber-500" 
+                      : "text-[var(--text-tertiary)] hover:text-amber-400"
+                  }`} 
+                />
+              </button>
+              
+              {isActivating ? (
+                <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: color }} />
+              ) : (
+                <Play
+                  className="w-5 h-5 text-[var(--text-tertiary)]"
+                />
+              )}
+            </div>
           </div>
 
           <div className="flex items-start justify-between gap-2 mb-1">

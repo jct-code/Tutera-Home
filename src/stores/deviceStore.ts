@@ -40,6 +40,9 @@ interface DeviceState {
   mediaRooms: MediaRoom[];
   quickActions: QuickAction[];
   
+  // Favorite scenes (persisted locally)
+  favoriteSceneIds: string[];
+  
   // Loading states
   isLoading: boolean;
   error: string | null;
@@ -62,6 +65,9 @@ interface DeviceState {
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
   setLastUpdated: (date: Date) => void;
+  
+  // Favorite scene actions
+  toggleFavoriteScene: (sceneId: string) => void;
   
   // Optimistic update helpers
   updateLight: (id: string, updates: Partial<Light>) => void;
@@ -89,6 +95,7 @@ export const useDeviceStore = create<DeviceState>()(
       securityDevices: [],
       mediaRooms: [],
       quickActions: [],
+      favoriteSceneIds: [],
       isLoading: false,
       error: null,
       lastUpdated: null,
@@ -142,6 +149,13 @@ export const useDeviceStore = create<DeviceState>()(
       setError: (error) => set({ error }),
       setLastUpdated: (date) => set({ lastUpdated: date }),
 
+      toggleFavoriteScene: (sceneId) =>
+        set((state) => ({
+          favoriteSceneIds: state.favoriteSceneIds.includes(sceneId)
+            ? state.favoriteSceneIds.filter((id) => id !== sceneId)
+            : [...state.favoriteSceneIds, sceneId],
+        })),
+
       updateLight: (id, updates) =>
         set((state) => ({
           lights: state.lights.map((light) =>
@@ -185,6 +199,7 @@ export const useDeviceStore = create<DeviceState>()(
           securityDevices: [],
           mediaRooms: [],
           quickActions: [],
+          favoriteSceneIds: [],
           isLoading: false,
           error: null,
           lastUpdated: null,
@@ -196,6 +211,7 @@ export const useDeviceStore = create<DeviceState>()(
       partialize: (state) => ({
         areas: state.areas,
         rooms: state.rooms,
+        virtualRooms: state.virtualRooms,
         lights: state.lights,
         shades: state.shades,
         scenes: state.scenes,
@@ -206,6 +222,7 @@ export const useDeviceStore = create<DeviceState>()(
         securityDevices: state.securityDevices,
         mediaRooms: state.mediaRooms,
         quickActions: state.quickActions,
+        favoriteSceneIds: state.favoriteSceneIds,
         lastUpdated: state.lastUpdated,
         // Don't persist isLoading or error - these should be transient
       }),
@@ -2518,4 +2535,20 @@ export function getRoomZonesWithData(): RoomZoneWithData[] {
   areaZones.sort((a, b) => getZoneOrder(a.zone.name) - getZoneOrder(b.zone.name));
   
   return [wholeHouseZone, ...areaZones];
+}
+
+// Get favorite scenes for a specific room
+export function getFavoriteScenesForRoom(roomId: string): Scene[] {
+  const { scenes, favoriteSceneIds } = useDeviceStore.getState();
+  
+  return scenes.filter(scene => 
+    scene.roomId === roomId && favoriteSceneIds.includes(scene.id)
+  );
+}
+
+// Get all favorite scenes
+export function getFavoriteScenes(): Scene[] {
+  const { scenes, favoriteSceneIds } = useDeviceStore.getState();
+  
+  return scenes.filter(scene => favoriteSceneIds.includes(scene.id));
 }

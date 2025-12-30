@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/Card";
 import { LightCard, LightGroupControl, levelToPercent, percentToLevel } from "@/components/devices/LightCard";
 import { EquipmentCard } from "@/components/devices/EquipmentCard";
 import type { LightingRoomGroup } from "@/stores/deviceStore";
-import { setLightState } from "@/stores/deviceStore";
-import { Building2, Lightbulb, ChevronDown, ChevronRight, Power } from "lucide-react";
+import { setLightState, useDeviceStore, recallScene } from "@/stores/deviceStore";
+import type { Scene } from "@/lib/crestron/types";
+import { Building2, Lightbulb, ChevronDown, ChevronRight, Power, Star, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Helper to get/set last brightness level from localStorage
@@ -35,6 +36,41 @@ function setLastBrightness(lightId: string, brightness: number): void {
   }
 }
 
+// Compact scene button for room groups
+function CompactSceneButton({ scene }: { scene: Scene }) {
+  const [isActivating, setIsActivating] = useState(false);
+  
+  const handleActivate = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsActivating(true);
+    await recallScene(scene.id);
+    setTimeout(() => setIsActivating(false), 1000);
+  }, [scene.id]);
+  
+  return (
+    <button
+      onClick={handleActivate}
+      disabled={isActivating}
+      className={`
+        flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+        bg-amber-500/10 text-amber-600 hover:bg-amber-500/20
+        transition-colors disabled:opacity-50
+        ${scene.isActive ? "ring-1 ring-amber-500" : ""}
+      `}
+      title={`Activate ${scene.name}`}
+    >
+      {isActivating ? (
+        <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <Play className="w-3 h-3" />
+      )}
+      <span className="truncate max-w-[100px]">{scene.name}</span>
+      {scene.isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
+    </button>
+  );
+}
+
 interface LightingRoomGroupComponentProps {
   group: LightingRoomGroup;
   expanded?: boolean;
@@ -46,7 +82,17 @@ export function LightingRoomGroup({
   expanded = false, 
   onToggleExpand 
 }: LightingRoomGroupComponentProps) {
-  const { roomName, lights, lightsOn, totalLights, avgBrightness, equipment } = group;
+  const { roomId, roomName, lights, lightsOn, totalLights, avgBrightness, equipment } = group;
+  
+  // Get favorite scenes for this room
+  const scenes = useDeviceStore((state) => state.scenes);
+  const favoriteSceneIds = useDeviceStore((state) => state.favoriteSceneIds);
+  
+  const favoriteScenes = useMemo(() => {
+    return scenes.filter(
+      (scene) => scene.roomId === roomId && favoriteSceneIds.includes(scene.id)
+    );
+  }, [scenes, favoriteSceneIds, roomId]);
   
   const lightsOff = totalLights - lightsOn;
   const isOn = lightsOn > 0;
@@ -327,6 +373,26 @@ export function LightingRoomGroup({
             <span className={`text-sm font-medium tabular-nums transition-colors min-w-[2.5rem] text-right ${sliderDragging ? "text-[var(--light-color-warm)]" : "text-[var(--text-tertiary)]"}`}>
               {sliderDisplayPercent}%
             </span>
+          </div>
+        )}
+        
+        {/* Favorite Scenes - Quick access */}
+        {favoriteScenes.length > 0 && (
+          <div className="pt-3 border-t border-[var(--border-light)]">
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span className="text-xs text-[var(--text-tertiary)]">Quick Scenes</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {favoriteScenes.slice(0, 4).map((scene) => (
+                <CompactSceneButton key={scene.id} scene={scene} />
+              ))}
+              {favoriteScenes.length > 4 && (
+                <span className="text-xs text-[var(--text-tertiary)] self-center px-2">
+                  +{favoriteScenes.length - 4} more
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>
