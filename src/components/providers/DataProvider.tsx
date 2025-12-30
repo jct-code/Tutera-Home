@@ -5,9 +5,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { fetchAllData, useDeviceStore, checkTemperatureSatisfaction } from "@/stores/deviceStore";
 import { useThemeStore, applyTheme } from "@/stores/themeStore";
 
-// Default to 10 seconds if env var not set
+// Default to 3 seconds if env var not set (faster polling for near real-time updates)
 const REFRESH_INTERVAL = parseInt(
-  process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS || "10000",
+  process.env.NEXT_PUBLIC_REFRESH_INTERVAL_MS || "3000",
   10
 );
 

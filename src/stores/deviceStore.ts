@@ -24,6 +24,14 @@ import type {
 import { isFloorHeat, isTemperatureSatisfied, isEquipmentControl, separateLightsAndEquipment } from "@/lib/crestron/types";
 import { useAuthStore, refreshAuth } from "./authStore";
 
+// Helper for shallow comparison of arrays of objects by comparing JSON representations
+// This prevents unnecessary React re-renders when polled data hasn't changed
+function hasArrayChanged<T>(oldArray: T[], newArray: T[]): boolean {
+  if (oldArray.length !== newArray.length) return true;
+  // Compare serialized versions for deep equality check
+  return JSON.stringify(oldArray) !== JSON.stringify(newArray);
+}
+
 interface DeviceState {
   // Data
   areas: Area[];
@@ -337,7 +345,10 @@ export async function fetchAllData(isRetryAfterRefresh = false) {
           areaName,
         };
       });
-      store.setRooms(transformedRooms);
+      // Only update rooms if they changed
+      if (hasArrayChanged(store.rooms, transformedRooms)) {
+        store.setRooms(transformedRooms);
+      }
     }
     
     // If areas don't have roomIds from API, build them from room data
@@ -373,47 +384,49 @@ export async function fetchAllData(isRetryAfterRefresh = false) {
       }
     }
     
-    if (areas.length > 0) {
+    // Only update areas if they changed
+    if (areas.length > 0 && hasArrayChanged(store.areas, areas)) {
       store.setAreas(areas);
     }
     
-    // Process devices - only update if we got actual data (don't overwrite with empty)
+    // Process devices - only update if data changed (prevents unnecessary React re-renders)
+    // This is important for fast polling (3s) to avoid UI flickering
     if (devicesData.success && devicesData.data) {
-      // Only update each device type if we got non-empty data (preserve existing data on partial failures)
-      if (devicesData.data.lights?.length > 0) {
+      // Only update each device type if we got non-empty data AND it has changed
+      if (devicesData.data.lights?.length > 0 && hasArrayChanged(store.lights, devicesData.data.lights)) {
         store.setLights(devicesData.data.lights);
       }
-      if (devicesData.data.shades?.length > 0) {
+      if (devicesData.data.shades?.length > 0 && hasArrayChanged(store.shades, devicesData.data.shades)) {
         store.setShades(devicesData.data.shades);
       }
-      if (devicesData.data.thermostats?.length > 0) {
+      if (devicesData.data.thermostats?.length > 0 && hasArrayChanged(store.thermostats, devicesData.data.thermostats)) {
         store.setThermostats(devicesData.data.thermostats);
       }
-      if (devicesData.data.doorLocks?.length > 0) {
+      if (devicesData.data.doorLocks?.length > 0 && hasArrayChanged(store.doorLocks, devicesData.data.doorLocks)) {
         store.setDoorLocks(devicesData.data.doorLocks);
       }
-      if (devicesData.data.sensors?.length > 0) {
+      if (devicesData.data.sensors?.length > 0 && hasArrayChanged(store.sensors, devicesData.data.sensors)) {
         store.setSensors(devicesData.data.sensors);
       }
-      if (devicesData.data.securityDevices?.length > 0) {
+      if (devicesData.data.securityDevices?.length > 0 && hasArrayChanged(store.securityDevices, devicesData.data.securityDevices)) {
         store.setSecurityDevices(devicesData.data.securityDevices);
       }
-      if (devicesData.data.mediaRooms?.length > 0) {
+      if (devicesData.data.mediaRooms?.length > 0 && hasArrayChanged(store.mediaRooms, devicesData.data.mediaRooms)) {
         store.setMediaRooms(devicesData.data.mediaRooms);
       }
     }
     
-    // Process scenes - only update if we got actual data
-    if (scenesData.success && scenesArray.length > 0) {
+    // Process scenes - only update if data changed
+    if (scenesData.success && scenesArray.length > 0 && hasArrayChanged(store.scenes, scenesArray)) {
       store.setScenes(scenesArray);
     }
     
-    // Process virtual rooms from server
-    if (virtualRoomsData.success && Array.isArray(virtualRoomsData.data)) {
+    // Process virtual rooms from server - only update if changed
+    if (virtualRoomsData.success && Array.isArray(virtualRoomsData.data) && hasArrayChanged(store.virtualRooms, virtualRoomsData.data)) {
       store.setVirtualRooms(virtualRoomsData.data);
     }
     
-    // Update timestamp on success
+    // Always update timestamp so users know polling is working
     store.setLastUpdated(new Date());
     
     // Check for any errors
@@ -2173,6 +2186,7 @@ export interface RoomStatus {
     currentTemp: number;
     setPoint: number;
     mode: string;
+    isFloorHeatOnly: boolean;  // True if room only has floor heat thermostat (no main thermostat)
   } | null;
   mediaStatus: {
     isPoweredOn: boolean;
@@ -2246,6 +2260,12 @@ export function getRoomsWithStatus(): RoomStatus[] {
       avgBrightness: lightingGroup.avgBrightness,
     } : null;
     
+    // Check if this room only has a floor heat thermostat (no main thermostat)
+    // This happens when the pair has no floorHeat and the mainThermostat IS a floor heat unit
+    const isFloorHeatOnly = thermostatPair ? (
+      thermostatPair.floorHeat === null && isFloorHeat(thermostatPair.mainThermostat)
+    ) : false;
+    
     const climateStatus = thermostatPair ? {
       currentTemp: thermostatPair.mainThermostat.currentTemp,
       setPoint: thermostatPair.mainThermostat.mode === "heat"
@@ -2254,6 +2274,7 @@ export function getRoomsWithStatus(): RoomStatus[] {
           ? thermostatPair.mainThermostat.coolSetPoint
           : thermostatPair.mainThermostat.heatSetPoint,
       mode: thermostatPair.mainThermostat.mode || "off",
+      isFloorHeatOnly,
     } : null;
     
     const mediaStatus = mediaRoom ? {
@@ -2292,7 +2313,7 @@ export function getRoomsWithStatus(): RoomStatus[] {
       avgBrightness: Math.round(totalBrightness / totalLights),
     } : null;
     
-    // Aggregate climate status from all source rooms
+    // Aggregate climate status from all source rooms (exclude floor-heat-only rooms)
     const sourceTemps: number[] = [];
     const sourceSetPoints: number[] = [];
     let hasActiveClimate = false;
@@ -2300,6 +2321,10 @@ export function getRoomsWithStatus(): RoomStatus[] {
     virtualRoom.sourceRoomIds.forEach(roomId => {
       const thermostatPair = thermostatMap.get(roomId);
       if (thermostatPair) {
+        // Skip floor-heat-only rooms (no main thermostat, only floor heat)
+        const isFloorHeatOnlyRoom = thermostatPair.floorHeat === null && isFloorHeat(thermostatPair.mainThermostat);
+        if (isFloorHeatOnlyRoom) return;
+        
         sourceTemps.push(thermostatPair.mainThermostat.currentTemp);
         const setPoint = thermostatPair.mainThermostat.mode === "heat"
           ? thermostatPair.mainThermostat.heatSetPoint
@@ -2317,6 +2342,7 @@ export function getRoomsWithStatus(): RoomStatus[] {
       currentTemp: Math.round(sourceTemps.reduce((sum, t) => sum + t, 0) / sourceTemps.length),
       setPoint: Math.round(sourceSetPoints.reduce((sum, t) => sum + t, 0) / sourceSetPoints.length),
       mode: hasActiveClimate ? "auto" : "off",
+      isFloorHeatOnly: false, // Virtual rooms aggregate multiple sources, so not floor-heat-only
     } : null;
     
     // Aggregate media status from all source rooms
@@ -2433,22 +2459,22 @@ export function getRoomZonesWithData(): RoomZoneWithData[] {
       return sum + weightedBrightness;
     }, 0) / (wholeHouseTotalLights || 1);
   
-  const wholeHouseTemps = wholeHouseRooms
-    .filter(rs => rs.climateStatus !== null)
-    .map(rs => rs.climateStatus!.currentTemp);
+  // Filter out floor-heat-only rooms when calculating average temperatures
+  const wholeHouseMainClimateRooms = wholeHouseRooms.filter(rs => 
+    rs.climateStatus !== null && !rs.climateStatus.isFloorHeatOnly
+  );
+  const wholeHouseTemps = wholeHouseMainClimateRooms.map(rs => rs.climateStatus!.currentTemp);
   const wholeHouseAvgTemp = wholeHouseTemps.length > 0
     ? Math.round(wholeHouseTemps.reduce((sum, t) => sum + t, 0) / wholeHouseTemps.length)
     : 0;
   
-  const wholeHouseSetPoints = wholeHouseRooms
-    .filter(rs => rs.climateStatus !== null)
-    .map(rs => rs.climateStatus!.setPoint);
+  const wholeHouseSetPoints = wholeHouseMainClimateRooms.map(rs => rs.climateStatus!.setPoint);
   const wholeHouseAvgSetPoint = wholeHouseSetPoints.length > 0
     ? Math.round(wholeHouseSetPoints.reduce((sum, t) => sum + t, 0) / wholeHouseSetPoints.length)
     : 0;
   
-  const wholeHouseActiveThermostats = wholeHouseRooms.filter(rs => 
-    rs.climateStatus !== null && rs.climateStatus.mode !== "off"
+  const wholeHouseActiveThermostats = wholeHouseMainClimateRooms.filter(rs => 
+    rs.climateStatus!.mode !== "off"
   ).length;
   
   // Media stats for Whole House
@@ -2489,22 +2515,22 @@ export function getRoomZonesWithData(): RoomZoneWithData[] {
         return sum + weightedBrightness;
       }, 0) / (zoneTotalLights || 1);
     
-    const zoneTemps = zoneRooms
-      .filter(rs => rs.climateStatus !== null)
-      .map(rs => rs.climateStatus!.currentTemp);
+    // Filter out floor-heat-only rooms when calculating average temperatures
+    const zoneMainClimateRooms = zoneRooms.filter(rs => 
+      rs.climateStatus !== null && !rs.climateStatus.isFloorHeatOnly
+    );
+    const zoneTemps = zoneMainClimateRooms.map(rs => rs.climateStatus!.currentTemp);
     const zoneAvgTemp = zoneTemps.length > 0
       ? Math.round(zoneTemps.reduce((sum, t) => sum + t, 0) / zoneTemps.length)
       : 0;
     
-    const zoneSetPoints = zoneRooms
-      .filter(rs => rs.climateStatus !== null)
-      .map(rs => rs.climateStatus!.setPoint);
+    const zoneSetPoints = zoneMainClimateRooms.map(rs => rs.climateStatus!.setPoint);
     const zoneAvgSetPoint = zoneSetPoints.length > 0
       ? Math.round(zoneSetPoints.reduce((sum, t) => sum + t, 0) / zoneSetPoints.length)
       : 0;
     
-    const zoneActiveThermostats = zoneRooms.filter(rs => 
-      rs.climateStatus !== null && rs.climateStatus.mode !== "off"
+    const zoneActiveThermostats = zoneMainClimateRooms.filter(rs => 
+      rs.climateStatus!.mode !== "off"
     ).length;
     
     // Media stats

@@ -129,19 +129,27 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
 
   if (compact) {
     return (
-      <motion.button
-        onClick={handleActivate}
-        disabled={isActivating}
+      <motion.div
+        onClick={isActivating ? undefined : handleActivate}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && !isActivating) {
+            e.preventDefault();
+            handleActivate();
+          }
+        }}
+        role="button"
+        tabIndex={isActivating ? -1 : 0}
+        aria-disabled={isActivating}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         className={`
-          w-full p-3 rounded-xl text-left border
+          w-full p-3 rounded-xl text-left border cursor-pointer
           transition-all duration-300
           ${isActive 
             ? "ring-2 ring-offset-2 shadow-sm" 
             : "hover:bg-[var(--surface-hover)]"
           }
-          ${isActivating ? "opacity-70" : ""}
+          ${isActivating ? "opacity-70 cursor-not-allowed" : ""}
         `}
         style={{
           backgroundColor: isActive ? `${color}20` : "var(--surface)",
@@ -204,7 +212,7 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" style={{ color }} />
           )}
         </div>
-      </motion.button>
+      </motion.div>
     );
   }
 
@@ -220,12 +228,20 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
         "--tw-ring-color": isActive ? color : undefined,
       }}
     >
-      <motion.button
-        onClick={handleActivate}
-        disabled={isActivating}
+      <motion.div
+        onClick={isActivating ? undefined : handleActivate}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && !isActivating) {
+            e.preventDefault();
+            handleActivate();
+          }
+        }}
+        role="button"
+        tabIndex={isActivating ? -1 : 0}
+        aria-disabled={isActivating}
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
-        className="w-full p-5 text-left"
+        className={`w-full p-5 text-left cursor-pointer ${isActivating ? "cursor-not-allowed" : ""}`}
       >
         {/* Background gradient */}
         <div
@@ -307,7 +323,7 @@ export function SceneCard({ scene, compact = false, roomName }: SceneCardProps) 
             </p>
           )}
         </div>
-      </motion.button>
+      </motion.div>
     </Card>
   );
 }

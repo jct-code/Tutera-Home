@@ -28,25 +28,35 @@ export function GlobalThermostatControl({ thermostats }: GlobalThermostatControl
     fetchWeather();
   }, []);
   
-  // Calculate average current temperature and setpoint
+  // Calculate average current temperature and setpoint (excluding floor heat thermostats)
   const { avgCurrentTemp, avgSetPoint, activeCount } = useMemo(() => {
-    const activeThermostats = thermostats.filter(t => t.mode !== 'off');
+    // Filter out floor heat thermostats for average calculations
+    const mainThermostats = thermostats.filter(t => !isFloorHeat(t));
+    const activeThermostats = mainThermostats.filter(t => t.mode !== 'off');
     
-    if (activeThermostats.length === 0) {
+    if (mainThermostats.length === 0) {
       return { 
-        avgCurrentTemp: Math.round(thermostats.reduce((sum, t) => sum + t.currentTemp, 0) / thermostats.length) || 0,
+        avgCurrentTemp: 0,
         avgSetPoint: 70, 
         activeCount: 0 
       };
     }
     
-    const totalCurrent = thermostats.reduce((sum, t) => sum + t.currentTemp, 0);
+    if (activeThermostats.length === 0) {
+      return { 
+        avgCurrentTemp: Math.round(mainThermostats.reduce((sum, t) => sum + t.currentTemp, 0) / mainThermostats.length) || 0,
+        avgSetPoint: 70, 
+        activeCount: 0 
+      };
+    }
+    
+    const totalCurrent = mainThermostats.reduce((sum, t) => sum + t.currentTemp, 0);
     const totalSetPoint = activeThermostats.reduce((sum, t) => {
       return sum + (t.mode === 'heat' ? t.heatSetPoint : t.coolSetPoint);
     }, 0);
     
     return {
-      avgCurrentTemp: Math.round(totalCurrent / thermostats.length),
+      avgCurrentTemp: Math.round(totalCurrent / mainThermostats.length),
       avgSetPoint: Math.round(totalSetPoint / activeThermostats.length),
       activeCount: activeThermostats.length,
     };
