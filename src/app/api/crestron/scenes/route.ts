@@ -163,15 +163,16 @@ function transformScene(s: CrestronScene, roomNameMap: Map<number, string>) {
   };
 }
 
-// Deduplicate scenes by name (keeps first occurrence of each unique name)
-function deduplicateScenes<T extends { name: string }>(scenes: T[]): T[] {
+// Deduplicate scenes by room + name (keeps first occurrence of each unique name within each room)
+function deduplicateScenes<T extends { name: string; roomId?: number }>(scenes: T[]): T[] {
   const seen = new Set<string>();
   return scenes.filter(scene => {
-    const lowerName = scene.name.toLowerCase();
-    if (seen.has(lowerName)) {
+    // Use roomId + name as the key so scenes with the same name in different rooms are kept
+    const key = `${scene.roomId ?? 'no-room'}-${scene.name.toLowerCase()}`;
+    if (seen.has(key)) {
       return false;
     }
-    seen.add(lowerName);
+    seen.add(key);
     return true;
   });
 }
