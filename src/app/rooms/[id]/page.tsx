@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, RefreshCw, Lightbulb, Blinds, Layers, Power, Music } from "lucide-react";
-import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { LightCard, LightGroupControl, levelToPercent, percentToLevel } from "@/components/devices/LightCard";
@@ -41,7 +40,6 @@ import { ThermostatCard } from "@/components/devices/ThermostatCard";
 import { SensorCard } from "@/components/devices/SensorCard";
 import { EquipmentCard } from "@/components/devices/EquipmentCard";
 import { MediaRoomCard } from "@/components/devices/MediaRoomCard";
-import { Button } from "@/components/ui/Button";
 import { separateLightsAndEquipment } from "@/lib/crestron/types";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
 import { useAuthStore } from "@/stores/authStore";
@@ -225,14 +223,18 @@ export default function RoomPage() {
       <Header />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Page Header */}
+        {/* Page Header - Clickable area to go back */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="icon" aria-label="Back">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
+          <div 
+            className="flex items-center gap-4 cursor-pointer flex-1 group"
+            onClick={() => router.push("/")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push("/"); }}
+          >
+            <div className="p-2 rounded-xl group-hover:bg-[var(--surface-hover)] transition-colors">
+              <ArrowLeft className="w-5 h-5 text-[var(--text-secondary)]" />
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 {isVirtualRoom && (
@@ -251,7 +253,10 @@ export default function RoomPage() {
             </div>
           </div>
           <button
-            onClick={handleRefresh}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefresh();
+            }}
             disabled={isRefreshing || isLoading}
             className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
