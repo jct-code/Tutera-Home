@@ -265,8 +265,11 @@ export function LightingRoomGroup({
     <Card padding="lg" className="bg-gradient-to-br from-yellow-500/5 to-transparent relative overflow-hidden">
       {/* Single unified card content */}
       <div className="space-y-3">
-        {/* Header Section */}
-        <div className="relative flex items-center justify-between">
+        {/* Header Section - Clickable to expand/collapse */}
+        <div 
+          className={`relative flex items-center justify-between ${onToggleExpand ? 'cursor-pointer' : ''}`}
+          onClick={() => onToggleExpand?.()}
+        >
           <div className="flex items-center gap-3 flex-1">
             <motion.button
               data-toggle-button
@@ -313,22 +316,15 @@ export function LightingRoomGroup({
               {totalLights} light{totalLights !== 1 ? "s" : ""}
             </span>
             
-            {/* Expand button */}
+            {/* Expand indicator */}
             {onToggleExpand && (
-              <button
-                data-expand-button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleExpand();
-                }}
-                className="p-1 hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
-              >
+              <div className="p-1">
                 {expanded ? (
                   <ChevronDown className="w-5 h-5 text-[var(--text-tertiary)]" />
                 ) : (
                   <ChevronRight className="w-5 h-5 text-[var(--text-tertiary)]" />
                 )}
-              </button>
+              </div>
             )}
           </div>
         </div>
