@@ -299,65 +299,43 @@ export function LightingZoneControl({
         </div>
       </div>
 
-      {/* Collapsed View Slider */}
+      {/* Collapsed View - Brightness Preset Buttons (safer for touch devices) */}
       {!expanded && lights.length > 0 && (
-        <div 
-          ref={sliderRef}
-          onPointerDown={handleSliderPointerDown}
-          onPointerMove={handleSliderPointerMove}
-          onPointerUp={handleSliderPointerUp}
-          onPointerCancel={handleSliderPointerUp}
-          role="slider"
-          aria-label={`${zone.name} lights control. ${lightsOn} of ${totalLights} on at ${avgPercent}% average brightness. Slide to adjust.`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={avgPercent}
-          aria-valuetext={`${avgPercent}% brightness`}
-          tabIndex={0}
-          className={`
-            relative overflow-hidden rounded-[var(--radius)] cursor-ew-resize
-            transition-shadow duration-300 select-none touch-none
-            border border-[var(--border-light)] bg-[var(--surface)]
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
-            ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}
-            ${isUpdating ? "opacity-70 pointer-events-none" : ""}
-            mt-4
-          `}
-        >
-          {/* Dynamic background gradient fill */}
-          <motion.div
-            className="absolute inset-0 pointer-events-none"
-            animate={{
-              background: `linear-gradient(90deg, 
-                rgba(255,255,255,0.95) 0%, 
-                rgba(252,211,77,${0.2 + (bgFillPercent / 100) * 0.4}) ${bgFillPercent}%, 
-                rgba(245,158,11,${0.15 + (bgFillPercent / 100) * 0.4}) ${bgFillPercent}%, 
-                rgba(255,255,255,0.95) ${bgFillPercent + 2}%
-              )`,
-            }}
-            transition={{ duration: isDragging ? 0.05 : 0.3 }}
-          />
-          
-          {/* Content */}
-          <div className="relative p-2">
-            <div className="flex items-center gap-3">
-              {/* Slider bar */}
-              <div className="flex-1 h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background: "linear-gradient(90deg, var(--light-color), var(--light-color-warm))",
+        <div className={`mt-4 ${isUpdating ? "opacity-70 pointer-events-none" : ""}`}>
+          <div className="flex items-center gap-1.5">
+            {[
+              { label: "Off", value: 0 },
+              { label: "25%", value: 25 },
+              { label: "50%", value: 50 },
+              { label: "75%", value: 75 },
+              { label: "100%", value: 100 },
+            ].map((preset) => {
+              const isActive = !isOn && preset.value === 0 || 
+                (isOn && avgPercent >= preset.value - 12 && avgPercent <= preset.value + 12);
+              return (
+                <button
+                  key={preset.value}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAllLights(preset.value);
                   }}
-                  animate={{ width: `${displayPercent}%` }}
-                  transition={{ duration: isDragging ? 0.05 : 0.3 }}
-                />
-              </div>
-              
-              {/* Percentage display on the right */}
-              <span className={`text-sm font-medium tabular-nums transition-colors shrink-0 ${isDragging ? "text-[var(--light-color-warm)]" : "text-[var(--text-tertiary)]"}`}>
-                {displayPercent}%
-              </span>
-            </div>
+                  disabled={isUpdating}
+                  className={`
+                    flex-1 py-2 px-1 rounded-lg text-xs font-medium
+                    transition-all duration-200 
+                    ${isActive
+                      ? preset.value === 0 
+                        ? "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                        : "bg-yellow-400 text-yellow-900 shadow-sm"
+                      : "bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] border border-[var(--border-light)]"
+                    }
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  `}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
