@@ -366,6 +366,37 @@ export class CrestronClient {
     });
   }
 
+  // Transport controls (may not be available on all Crestron systems)
+  async mediaRoomPlay(id: string): Promise<ApiResponse<void>> {
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_PLAY(id), {
+      method: "POST",
+    });
+  }
+
+  async mediaRoomPause(id: string): Promise<ApiResponse<void>> {
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_PAUSE(id), {
+      method: "POST",
+    });
+  }
+
+  async mediaRoomStop(id: string): Promise<ApiResponse<void>> {
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_STOP(id), {
+      method: "POST",
+    });
+  }
+
+  async mediaRoomNext(id: string): Promise<ApiResponse<void>> {
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_NEXT(id), {
+      method: "POST",
+    });
+  }
+
+  async mediaRoomPrevious(id: string): Promise<ApiResponse<void>> {
+    return this.request<void>(CRESTRON_ENDPOINTS.MEDIA_ROOM_PREVIOUS(id), {
+      method: "POST",
+    });
+  }
+
   // Video Rooms (may contain display/TV info)
   async getVideoRooms(): Promise<ApiResponse<unknown[]>> {
     return this.request<unknown[]>(CRESTRON_ENDPOINTS.VIDEO_ROOMS);

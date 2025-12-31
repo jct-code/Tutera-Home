@@ -261,9 +261,35 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // Transport controls (may not be available on all systems)
+      case "play": {
+        result = await client.mediaRoomPlay(id);
+        break;
+      }
+
+      case "pause": {
+        result = await client.mediaRoomPause(id);
+        break;
+      }
+
+      case "stop": {
+        result = await client.mediaRoomStop(id);
+        break;
+      }
+
+      case "next": {
+        result = await client.mediaRoomNext(id);
+        break;
+      }
+
+      case "previous": {
+        result = await client.mediaRoomPrevious(id);
+        break;
+      }
+
       default:
         return NextResponse.json(
-          { success: false, error: `Unknown action: ${action}. Valid actions: power, volume, mute, source` },
+          { success: false, error: `Unknown action: ${action}. Valid actions: power, volume, mute, source, play, pause, stop, next, previous` },
           { status: 400 }
         );
     }

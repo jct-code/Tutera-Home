@@ -59,6 +59,12 @@ export const CRESTRON_ENDPOINTS = {
   MEDIA_ROOM_VOLUME: (id: string, level: number) => `/cws/api/mediarooms/${id}/volume/${level}`,
   MEDIA_ROOM_POWER: (id: string, state: "on" | "off") => `/cws/api/mediarooms/${id}/power/${state}`,
   MEDIA_ROOM_SELECT_SOURCE: (id: string, sourceId: number) => `/cws/api/mediarooms/${id}/selectsource/${sourceId}`,
+  // Transport controls (may not be available on all systems)
+  MEDIA_ROOM_PLAY: (id: string) => `/cws/api/mediarooms/${id}/play`,
+  MEDIA_ROOM_PAUSE: (id: string) => `/cws/api/mediarooms/${id}/pause`,
+  MEDIA_ROOM_STOP: (id: string) => `/cws/api/mediarooms/${id}/stop`,
+  MEDIA_ROOM_NEXT: (id: string) => `/cws/api/mediarooms/${id}/next`,
+  MEDIA_ROOM_PREVIOUS: (id: string) => `/cws/api/mediarooms/${id}/previous`,
   
   // Video Rooms (separate from media rooms - may have display info)
   VIDEO_ROOMS: "/cws/api/videorooms",

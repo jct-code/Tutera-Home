@@ -20,6 +20,7 @@ import type {
   ThermostatZone,
   ThermostatZoneWithData,
   FanMode,
+  AudioZone,
 } from "@/lib/crestron/types";
 import { isFloorHeat, isTemperatureSatisfied, isEquipmentControl, separateLightsAndEquipment } from "@/lib/crestron/types";
 import { useAuthStore, refreshAuth } from "./authStore";
@@ -47,6 +48,7 @@ interface DeviceState {
   securityDevices: SecurityDevice[];
   mediaRooms: MediaRoom[];
   quickActions: QuickAction[];
+  audioZones: AudioZone[];  // User-defined audio zones
   
   // Favorite scenes (persisted locally)
   favoriteSceneIds: string[];
@@ -70,6 +72,7 @@ interface DeviceState {
   setSecurityDevices: (securityDevices: SecurityDevice[]) => void;
   setMediaRooms: (mediaRooms: MediaRoom[]) => void;
   setQuickActions: (quickActions: QuickAction[]) => void;
+  setAudioZones: (audioZones: AudioZone[]) => void;
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
   setLastUpdated: (date: Date) => void;
@@ -103,6 +106,7 @@ export const useDeviceStore = create<DeviceState>()(
       securityDevices: [],
       mediaRooms: [],
       quickActions: [],
+      audioZones: [],
       favoriteSceneIds: [],
       isLoading: false,
       error: null,
@@ -153,6 +157,7 @@ export const useDeviceStore = create<DeviceState>()(
       setSecurityDevices: (securityDevices) => set({ securityDevices }),
       setMediaRooms: (mediaRooms) => set({ mediaRooms }),
       setQuickActions: (quickActions) => set({ quickActions }),
+      setAudioZones: (audioZones) => set({ audioZones }),
       setLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
       setLastUpdated: (date) => set({ lastUpdated: date }),
@@ -207,6 +212,7 @@ export const useDeviceStore = create<DeviceState>()(
           securityDevices: [],
           mediaRooms: [],
           quickActions: [],
+          audioZones: [],
           favoriteSceneIds: [],
           isLoading: false,
           error: null,
@@ -230,6 +236,7 @@ export const useDeviceStore = create<DeviceState>()(
         securityDevices: state.securityDevices,
         mediaRooms: state.mediaRooms,
         quickActions: state.quickActions,
+        audioZones: state.audioZones,
         favoriteSceneIds: state.favoriteSceneIds,
         lastUpdated: state.lastUpdated,
         // Don't persist isLoading or error - these should be transient
@@ -271,13 +278,14 @@ export async function fetchAllData(isRetryAfterRefresh = false, silent = false) 
   store.setError(null);
   
   try {
-    // Fetch all data in parallel (including areas and virtual rooms from server)
-    const [areasData, roomsData, devicesData, scenesData, virtualRoomsData] = await Promise.all([
+    // Fetch all data in parallel (including areas, virtual rooms, and audio zones from server)
+    const [areasData, roomsData, devicesData, scenesData, virtualRoomsData, audioZonesData] = await Promise.all([
       fetchWithAuth("areas"),
       fetchWithAuth("rooms"),
       fetchWithAuth("devices"),
       fetchWithAuth("scenes"),
       fetch("/api/crestron/virtual-rooms", { cache: 'no-store' }).then(res => res.json()),
+      fetch("/api/crestron/audio-zones", { cache: 'no-store' }).then(res => res.json()),
     ]);
     
     // Check if all responses indicate potential auth failure (empty data or errors)
@@ -435,6 +443,11 @@ export async function fetchAllData(isRetryAfterRefresh = false, silent = false) 
     // Process virtual rooms from server - only update if changed
     if (virtualRoomsData.success && Array.isArray(virtualRoomsData.data) && hasArrayChanged(store.virtualRooms, virtualRoomsData.data)) {
       store.setVirtualRooms(virtualRoomsData.data);
+    }
+    
+    // Process audio zones from server - only update if changed
+    if (audioZonesData.success && Array.isArray(audioZonesData.data) && hasArrayChanged(store.audioZones, audioZonesData.data)) {
+      store.setAudioZones(audioZonesData.data);
     }
     
     // Always update timestamp so users know polling is working
@@ -1471,6 +1484,45 @@ export async function selectMediaRoomSource(id: string, sourceIndex: number) {
     await fetchMediaRooms();
     return false;
   }
+}
+
+// Transport controls (play/pause/skip) - may not be available on all Crestron systems
+export type TransportAction = "play" | "pause" | "stop" | "next" | "previous";
+
+export async function mediaRoomTransport(id: string, action: TransportAction): Promise<boolean> {
+  const headers = useAuthStore.getState().getAuthHeaders();
+  
+  try {
+    const response = await fetch("/api/crestron/media", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action }),
+    });
+    const data = await response.json();
+    return data.success;
+  } catch {
+    return false;
+  }
+}
+
+export async function mediaRoomPlay(id: string): Promise<boolean> {
+  return mediaRoomTransport(id, "play");
+}
+
+export async function mediaRoomPause(id: string): Promise<boolean> {
+  return mediaRoomTransport(id, "pause");
+}
+
+export async function mediaRoomStop(id: string): Promise<boolean> {
+  return mediaRoomTransport(id, "stop");
+}
+
+export async function mediaRoomNext(id: string): Promise<boolean> {
+  return mediaRoomTransport(id, "next");
+}
+
+export async function mediaRoomPrevious(id: string): Promise<boolean> {
+  return mediaRoomTransport(id, "previous");
 }
 
 // Get media rooms grouped by zone (similar to thermostat zones)
@@ -2599,4 +2651,135 @@ export function getFavoriteScenes(): Scene[] {
   const { scenes, favoriteSceneIds } = useDeviceStore.getState();
   
   return scenes.filter(scene => favoriteSceneIds.includes(scene.id));
+}
+
+// =============================================================================
+// Audio Zones CRUD operations
+// =============================================================================
+
+// Fetch audio zones from server
+export async function fetchAudioZones() {
+  const { setAudioZones, setError } = useDeviceStore.getState();
+  try {
+    const response = await fetch("/api/crestron/audio-zones", { cache: 'no-store' });
+    const data = await response.json();
+    if (data.success && Array.isArray(data.data)) {
+      setAudioZones(data.data);
+    } else {
+      setError(data.error || "Failed to fetch audio zones");
+    }
+  } catch (error) {
+    setError(error instanceof Error ? error.message : "Failed to fetch audio zones");
+  }
+}
+
+// Create a new audio zone
+export async function createAudioZone(name: string, mediaRoomIds: string[]): Promise<AudioZone | null> {
+  const { setAudioZones, audioZones } = useDeviceStore.getState();
+  
+  try {
+    const response = await fetch("/api/crestron/audio-zones", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, mediaRoomIds }),
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      // Add the new zone to state
+      setAudioZones([...audioZones, data.data]);
+      return data.data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Update an existing audio zone
+export async function updateAudioZone(
+  id: string, 
+  name?: string, 
+  mediaRoomIds?: string[]
+): Promise<AudioZone | null> {
+  const { setAudioZones, audioZones } = useDeviceStore.getState();
+  
+  try {
+    const response = await fetch("/api/crestron/audio-zones", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, name, mediaRoomIds }),
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      // Update the zone in state
+      setAudioZones(audioZones.map(zone => zone.id === id ? data.data : zone));
+      return data.data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Delete an audio zone
+export async function deleteAudioZone(id: string): Promise<boolean> {
+  const { setAudioZones, audioZones } = useDeviceStore.getState();
+  
+  try {
+    const response = await fetch(`/api/crestron/audio-zones?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    const data = await response.json();
+    if (data.success) {
+      // Remove the zone from state
+      setAudioZones(audioZones.filter(zone => zone.id !== id));
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// Get media room zones with computed data (includes both built-in and custom zones)
+export function getMediaRoomZonesWithCustom(): MediaRoomZoneWithData[] {
+  const { mediaRooms, audioZones, areas, rooms } = useDeviceStore.getState();
+  
+  if (mediaRooms.length === 0) return [];
+  
+  // First, get the built-in zones (from getMediaRoomZonesWithData)
+  const builtInZones = getMediaRoomZonesWithData();
+  
+  // Then add custom zones
+  const customZones: MediaRoomZoneWithData[] = audioZones
+    .filter(zone => !zone.isBuiltIn)
+    .map(zone => {
+      const zoneMediaRooms = mediaRooms.filter(m => 
+        zone.mediaRoomIds.includes(m.id)
+      );
+      
+      const playingRooms = zoneMediaRooms.filter(m => m.isPoweredOn);
+      const avgVolume = playingRooms.length > 0
+        ? Math.round(playingRooms.reduce((sum, m) => sum + m.volumePercent, 0) / playingRooms.length)
+        : 0;
+      
+      return {
+        zone: { id: zone.id, name: zone.name },
+        mediaRooms: zoneMediaRooms,
+        totalRooms: zoneMediaRooms.length,
+        playingCount: playingRooms.length,
+        avgVolume,
+      };
+    })
+    .filter(zone => zone.mediaRooms.length > 0); // Only include zones with rooms
+  
+  // Combine: Whole House first, then custom zones, then area zones
+  const wholeHouse = builtInZones.find(z => z.zone.id === "whole-house");
+  const areaZones = builtInZones.filter(z => z.zone.id !== "whole-house");
+  
+  return [
+    ...(wholeHouse ? [wholeHouse] : []),
+    ...customZones,
+    ...areaZones,
+  ];
 }

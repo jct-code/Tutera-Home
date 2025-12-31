@@ -615,7 +615,16 @@ export function ThermostatZoneControl({
                       </span>
                     </div>
                     <div className="flex items-center justify-between mt-1 text-xs text-[var(--text-secondary)]">
-                      <span>Now: <strong className="text-[var(--text-primary)]">{t.currentTemp}°</strong></span>
+                      <div className="flex items-center gap-1">
+                        <span>Now: <strong className="text-[var(--text-primary)]">{t.currentTemp}°</strong></span>
+                        {/* Active heating/cooling indicator */}
+                        {t.isHeating && (
+                          <Flame className="w-3 h-3 text-red-500" />
+                        )}
+                        {t.isCooling && (
+                          <Snowflake className="w-3 h-3 text-blue-500" />
+                        )}
+                      </div>
                       {t.mode !== "off" && (
                         <span>Set: <strong className="text-[var(--text-primary)]">{setPoint}°</strong></span>
                       )}

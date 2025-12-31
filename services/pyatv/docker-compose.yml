@@ -1,0 +1,22 @@
+# Docker Compose for pyatv service on Synology NAS
+# Place this file in /volume1/docker/pyatv/ on your Synology
+
+version: "3.8"
+
+services:
+  pyatv:
+    build: .
+    container_name: pyatv-service
+    restart: unless-stopped
+    network_mode: host  # Required for Apple TV discovery via mDNS/Bonjour
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data  # Persist pairing credentials
+    environment:
+      - TZ=America/Chicago  # Match your Synology timezone
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

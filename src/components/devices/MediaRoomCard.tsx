@@ -8,7 +8,18 @@ import {
   Volume2,
   VolumeX,
   ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Ban,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Circle,
+  Home,
+  Menu,
+  Loader2,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Slider } from "@/components/ui/Slider";
@@ -18,7 +29,11 @@ import {
   setMediaRoomPower, 
   setMediaRoomVolume, 
   setMediaRoomMute, 
-  selectMediaRoomSource 
+  selectMediaRoomSource,
+  mediaRoomPlay,
+  mediaRoomPause,
+  mediaRoomNext,
+  mediaRoomPrevious,
 } from "@/stores/deviceStore";
 
 interface MediaRoomCardProps {
@@ -43,10 +58,53 @@ function isVideoSource(sourceName: string | undefined): boolean {
   return videoKeywords.some(keyword => lowerName.includes(keyword));
 }
 
+// Helper to detect if source is specifically an Apple TV
+function isAppleTVSource(sourceName: string | undefined): boolean {
+  if (!sourceName) return false;
+  const lowerName = sourceName.toLowerCase();
+  return lowerName.includes('apple tv') || lowerName.includes('appletv') || lowerName.includes('atv');
+}
+
+// D-pad button component
+function DPadButton({
+  onClick,
+  disabled,
+  children,
+  className = "",
+  title,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`
+        w-10 h-10 flex items-center justify-center rounded-xl
+        bg-[var(--surface)] hover:bg-[var(--surface-hover)]
+        text-[var(--text-secondary)] hover:text-[var(--text-primary)]
+        transition-all duration-150 active:scale-95
+        disabled:opacity-50 disabled:cursor-not-allowed
+        ${className}
+      `}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoomCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showSourcePicker, setShowSourcePicker] = useState(false);
   const [localVolume, setLocalVolume] = useState<number | null>(null); // Local state for slider during drag
+  const [isRemoteLoading, setIsRemoteLoading] = useState(false);
+  const [lastRemoteCommand, setLastRemoteCommand] = useState<string | null>(null);
+  const [showDPad, setShowDPad] = useState(false); // Toggle D-pad visibility
   
   // Use a ref to always access the latest data in callbacks for other operations
   const mediaRoomRef = useRef(mediaRoom);
@@ -61,8 +119,9 @@ export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoo
   
   const displayName = roomName || mediaRoom.name;
   
-  // Determine if current source is video
+  // Determine if current source is video and specifically Apple TV
   const isVideo = isVideoSource(mediaRoom.currentSourceName);
+  const isAppleTV = isAppleTVSource(mediaRoom.currentSourceName);
   const MediaIcon = isVideo ? Tv : Music;
   
   const handlePowerToggle = useCallback(async () => {
@@ -102,6 +161,65 @@ export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoo
     setShowSourcePicker(false);
     await selectMediaRoomSource(mediaRoomRef.current.id, sourceIndex);
     setIsUpdating(false);
+  }, []);
+
+  // Transport control handlers
+  const handlePlay = useCallback(async () => {
+    setIsUpdating(true);
+    await mediaRoomPlay(mediaRoomRef.current.id);
+    setIsUpdating(false);
+  }, []);
+
+  const handlePause = useCallback(async () => {
+    setIsUpdating(true);
+    await mediaRoomPause(mediaRoomRef.current.id);
+    setIsUpdating(false);
+  }, []);
+
+  const handlePrevious = useCallback(async () => {
+    setIsUpdating(true);
+    await mediaRoomPrevious(mediaRoomRef.current.id);
+    setIsUpdating(false);
+  }, []);
+
+  const handleNext = useCallback(async () => {
+    setIsUpdating(true);
+    await mediaRoomNext(mediaRoomRef.current.id);
+    setIsUpdating(false);
+  }, []);
+
+  // Apple TV remote command handler
+  const sendAppleTVCommand = useCallback(async (command: string) => {
+    setIsRemoteLoading(true);
+    setLastRemoteCommand(command);
+    
+    try {
+      // First, try to get the list of Apple TVs
+      const devicesResponse = await fetch("/api/appletv/devices");
+      if (!devicesResponse.ok) {
+        console.warn("Apple TV service not available");
+        return;
+      }
+      
+      const devices = await devicesResponse.json();
+      if (!Array.isArray(devices) || devices.length === 0) {
+        console.warn("No Apple TVs found");
+        return;
+      }
+      
+      // Use the first connected device or first available device
+      const targetDevice = devices.find((d: { is_connected: boolean }) => d.is_connected) || devices[0];
+      
+      // Send the command
+      await fetch(`/api/appletv/devices/${targetDevice.id}/remote/${command}`, {
+        method: "POST",
+      });
+    } catch (error) {
+      console.warn("Failed to send Apple TV command:", error);
+    } finally {
+      setIsRemoteLoading(false);
+      setTimeout(() => setLastRemoteCommand(null), 200);
+    }
   }, []);
 
   // Compact view for lists
@@ -331,6 +449,162 @@ export function MediaRoomCard({ mediaRoom, compact = false, roomName }: MediaRoo
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Transport Controls - only show when powered on */}
+      {mediaRoom.isPoweredOn && (
+        <div className="mt-3">
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={handlePrevious}
+              disabled={isUpdating}
+              className="p-2 rounded-lg bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] transition-colors disabled:opacity-50"
+              title="Previous"
+            >
+              <SkipBack className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handlePlay}
+              disabled={isUpdating}
+              className="p-2.5 rounded-xl bg-slate-600 hover:bg-slate-700 text-white transition-colors disabled:opacity-50"
+              title="Play"
+            >
+              <Play className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handlePause}
+              disabled={isUpdating}
+              className="p-2.5 rounded-xl bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] transition-colors disabled:opacity-50"
+              title="Pause"
+            >
+              <Pause className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={isUpdating}
+              className="p-2 rounded-lg bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] transition-colors disabled:opacity-50"
+              title="Next"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Apple TV D-Pad Controls - show when Apple TV is the source */}
+      {mediaRoom.isPoweredOn && isAppleTV && (
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          {/* Toggle button for D-Pad */}
+          <button
+            onClick={() => setShowDPad(!showDPad)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 text-sm transition-colors mb-3"
+          >
+            <div className="flex items-center gap-2">
+              <Tv className="w-4 h-4 text-zinc-400" />
+              <span className="text-zinc-300">Apple TV Remote</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${showDPad ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* D-Pad and navigation controls */}
+          {showDPad && (
+            <div className="space-y-3">
+              {/* Loading indicator */}
+              {isRemoteLoading && (
+                <div className="flex justify-center">
+                  <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
+                </div>
+              )}
+
+              {/* D-Pad Navigation */}
+              <div className="flex justify-center">
+                <div className="grid grid-cols-3 gap-1">
+                  {/* Top row */}
+                  <div />
+                  <DPadButton 
+                    onClick={() => sendAppleTVCommand("up")} 
+                    disabled={isRemoteLoading}
+                    title="Up"
+                    className={lastRemoteCommand === "up" ? "bg-zinc-600" : ""}
+                  >
+                    <ChevronUp className="w-5 h-5" />
+                  </DPadButton>
+                  <div />
+
+                  {/* Middle row */}
+                  <DPadButton 
+                    onClick={() => sendAppleTVCommand("left")} 
+                    disabled={isRemoteLoading}
+                    title="Left"
+                    className={lastRemoteCommand === "left" ? "bg-zinc-600" : ""}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </DPadButton>
+                  <DPadButton 
+                    onClick={() => sendAppleTVCommand("select")} 
+                    disabled={isRemoteLoading}
+                    title="Select"
+                    className={`w-12 h-12 bg-zinc-700 hover:bg-zinc-600 ${lastRemoteCommand === "select" ? "bg-zinc-500" : ""}`}
+                  >
+                    <Circle className="w-6 h-6" />
+                  </DPadButton>
+                  <DPadButton 
+                    onClick={() => sendAppleTVCommand("right")} 
+                    disabled={isRemoteLoading}
+                    title="Right"
+                    className={lastRemoteCommand === "right" ? "bg-zinc-600" : ""}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </DPadButton>
+
+                  {/* Bottom row */}
+                  <div />
+                  <DPadButton 
+                    onClick={() => sendAppleTVCommand("down")} 
+                    disabled={isRemoteLoading}
+                    title="Down"
+                    className={lastRemoteCommand === "down" ? "bg-zinc-600" : ""}
+                  >
+                    <ChevronDown className="w-5 h-5" />
+                  </DPadButton>
+                  <div />
+                </div>
+              </div>
+
+              {/* Menu and Home buttons */}
+              <div className="flex justify-center gap-3">
+                <DPadButton 
+                  onClick={() => sendAppleTVCommand("menu")} 
+                  disabled={isRemoteLoading}
+                  title="Menu / Back"
+                  className={lastRemoteCommand === "menu" ? "bg-zinc-600" : ""}
+                >
+                  <Menu className="w-4 h-4" />
+                </DPadButton>
+                <DPadButton 
+                  onClick={() => sendAppleTVCommand("home")} 
+                  disabled={isRemoteLoading}
+                  title="Home"
+                  className={lastRemoteCommand === "home" ? "bg-zinc-600" : ""}
+                >
+                  <Home className="w-4 h-4" />
+                </DPadButton>
+                <DPadButton 
+                  onClick={() => sendAppleTVCommand("play_pause")} 
+                  disabled={isRemoteLoading}
+                  title="Play/Pause"
+                  className={lastRemoteCommand === "play_pause" ? "bg-zinc-600" : ""}
+                >
+                  <Play className="w-4 h-4" />
+                </DPadButton>
+              </div>
+
+              <p className="text-xs text-center text-zinc-500 mt-2">
+                Requires pyatv service running on your network
+              </p>
+            </div>
+          )}
         </div>
       )}
 

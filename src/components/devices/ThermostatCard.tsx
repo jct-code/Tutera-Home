@@ -48,6 +48,10 @@ export function ThermostatCard({ thermostat, compact = false, isFloorHeatOnly = 
     : mode === "cool" 
       ? thermostat.coolSetPoint 
       : thermostat.heatSetPoint; // Default to heat for display
+  
+  // Check if thermostat is actively calling for heat or cool
+  const isHeating = thermostat.isHeating === true;
+  const isCooling = thermostat.isCooling === true;
 
   const handleSetPointChange = useCallback(async (delta: number) => {
     setIsUpdating(true);
@@ -103,9 +107,19 @@ export function ThermostatCard({ thermostat, compact = false, isFloorHeatOnly = 
               <p className="font-medium text-sm text-[var(--text-primary)] truncate">
                 {thermostat.name}
               </p>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {thermostat.currentTemp}° • {config.label}
-              </p>
+              <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                <span>{thermostat.currentTemp}° • {config.label}</span>
+                {isHeating && (
+                  <span className="flex items-center gap-0.5 text-red-500">
+                    <Flame className="w-3 h-3" />
+                  </span>
+                )}
+                {isCooling && (
+                  <span className="flex items-center gap-0.5 text-blue-500">
+                    <Snowflake className="w-3 h-3" />
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="text-right">
@@ -121,15 +135,32 @@ export function ThermostatCard({ thermostat, compact = false, isFloorHeatOnly = 
   return (
     <Card padding="lg" className="bg-gradient-to-br from-[var(--climate-color)]/5 to-transparent">
       <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-[var(--climate-color)]/20 flex items-center justify-center">
-            <Thermometer className="w-6 h-6 text-[var(--climate-color)]" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-[var(--climate-color)]/20 flex items-center justify-center">
+              <Thermometer className="w-6 h-6 text-[var(--climate-color)]" />
+            </div>
+            <div>
+              <CardTitle>{thermostat.name}</CardTitle>
+              <p className="text-sm text-[var(--text-secondary)]">
+                {thermostat.humidity !== undefined && `${thermostat.humidity}% humidity`}
+              </p>
+            </div>
           </div>
-          <div>
-            <CardTitle>{thermostat.name}</CardTitle>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {thermostat.humidity !== undefined && `${thermostat.humidity}% humidity`}
-            </p>
+          {/* Active heating/cooling indicator */}
+          <div className="flex items-center gap-2">
+            {isHeating && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/20 text-red-500 text-xs font-medium">
+                <Flame className="w-3 h-3" />
+                <span>Heating</span>
+              </div>
+            )}
+            {isCooling && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-500 text-xs font-medium">
+                <Snowflake className="w-3 h-3" />
+                <span>Cooling</span>
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>

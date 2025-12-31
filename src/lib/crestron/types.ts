@@ -91,6 +91,8 @@ export interface Thermostat extends CrestronDevice {
   fanMode: FanMode;
   humidity?: number;
   isRunning?: boolean;
+  isHeating?: boolean;  // True when thermostat is actively calling for heat
+  isCooling?: boolean;  // True when thermostat is actively calling for cooling
 }
 
 export type ThermostatMode = "off" | "heat" | "cool" | "auto";
@@ -288,6 +290,16 @@ export interface QuickAction {
   icon?: string;
 }
 
+// Audio Zone (user-defined grouping of media rooms)
+export interface AudioZone {
+  id: string;
+  name: string;
+  mediaRoomIds: string[];  // Array of media room IDs in this zone
+  isBuiltIn?: boolean;     // True for auto-generated zones (Whole House, areas)
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // API Response Types
 export interface ApiResponse<T> {
   success: boolean;
@@ -341,6 +353,10 @@ export interface MediaRoomsResponse {
 
 export interface QuickActionsResponse {
   quickActions: QuickAction[];
+}
+
+export interface AudioZonesResponse {
+  audioZones: AudioZone[];
 }
 
 export interface VirtualRoomsResponse {

@@ -47,6 +47,30 @@ function transformThermostat(t: CrestronThermostat) {
   const heatSetPoint = t.currentSetPoint?.find(sp => sp.type === 'heat' || sp.type === 'auxHeat');
   const coolSetPoint = t.currentSetPoint?.find(sp => sp.type === 'cool');
   
+  // Calculate setpoint values (needed for calling calculation)
+  const heatSetPointTemp = heatSetPoint?.temperature ? Math.round(heatSetPoint.temperature / tempDivisor) : 0;
+  const coolSetPointTemp = coolSetPoint?.temperature ? Math.round(coolSetPoint.temperature / tempDivisor) : 999;
+  
+  // Determine if thermostat is actively calling for heat or cool
+  // Crestron API doesn't provide an explicit "calling" field, so we calculate it:
+  // - Calling for heat when in Heat mode AND current temp < heat setpoint
+  // - Calling for cool when in Cool mode AND current temp > cool setpoint
+  let isHeating = false;
+  let isCooling = false;
+  
+  if (t.currentMode === 'Heat' || t.currentMode === 'AuxHeat') {
+    isHeating = currentTemp < heatSetPointTemp;
+  } else if (t.currentMode === 'Cool') {
+    isCooling = currentTemp > coolSetPointTemp;
+  } else if (t.currentMode === 'Auto') {
+    // In Auto mode, check both directions
+    if (currentTemp < heatSetPointTemp) {
+      isHeating = true;
+    } else if (currentTemp > coolSetPointTemp) {
+      isCooling = true;
+    }
+  }
+  
   // Map mode names
   const modeMap: Record<string, string> = {
     'Off': 'off',
@@ -69,12 +93,14 @@ function transformThermostat(t: CrestronThermostat) {
     type: 'thermostat' as const,
     roomId: t.roomId ? String(t.roomId) : undefined,
     currentTemp,
-    heatSetPoint: heatSetPoint?.temperature ? Math.round(heatSetPoint.temperature / tempDivisor) : currentTemp,
-    coolSetPoint: coolSetPoint?.temperature ? Math.round(coolSetPoint.temperature / tempDivisor) : currentTemp + 5,
+    heatSetPoint: heatSetPointTemp || currentTemp,
+    coolSetPoint: coolSetPointTemp !== 999 ? coolSetPointTemp : currentTemp + 5,
     mode: (modeMap[t.currentMode] || 'off') as 'off' | 'heat' | 'cool' | 'auto',
     fanMode: (fanModeMap[t.currentFanMode || 'Auto'] || 'auto') as 'auto' | 'on',
     humidity: undefined,
     isRunning: t.currentMode !== 'Off',
+    isHeating,
+    isCooling,
   };
 }
 
@@ -297,7 +323,11 @@ export async function GET(request: NextRequest) {
   // Extract arrays from nested Crestron responses and transform to our format
   const lightsArray = extractArray<CrestronLight>(lights.data, 'lights').map(transformLight);
   const shadesArray = extractArray<CrestronShade>(shades.data, 'shades').map(transformShade);
-  const thermostatsArray = extractArray<CrestronThermostat>(thermostats.data, 'thermostats').map(transformThermostat);
+  
+  // Extract thermostats for transformation
+  const rawThermostats = extractArray<CrestronThermostat>(thermostats.data, 'thermostats');
+  
+  const thermostatsArray = rawThermostats.map(transformThermostat);
   const doorLocksArray = extractArray<CrestronDoorLock>(doorLocks.data, 'doorLocks').map(transformDoorLock);
   const sensorsArray = extractArray<CrestronSensor>(sensors.data, 'sensors').map(transformSensor);
   const securityDevicesArray = extractArray(securityDevices.data, 'securityDevices');

@@ -52,6 +52,10 @@ export function ThermostatRoomGroup({ pair }: ThermostatRoomGroupProps) {
   
   // Floor heat status
   const floorHeatActive = floorHeat && floorHeat.mode === 'heat';
+  
+  // Check if thermostat is actively calling for heat or cool
+  const isHeating = mainThermostat.isHeating === true;
+  const isCooling = mainThermostat.isCooling === true;
 
   const handleSetPointChange = useCallback(async (delta: number) => {
     setIsUpdating(true);
@@ -120,11 +124,26 @@ export function ThermostatRoomGroup({ pair }: ThermostatRoomGroupProps) {
               </p>
             </div>
           </div>
-          {isSatisfied && mode !== 'off' && (
-            <div className="px-2 py-1 rounded-full bg-green-500/20 text-green-500 text-xs font-medium">
-              Target Reached
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Active heating/cooling indicator */}
+            {isHeating && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/20 text-red-500 text-xs font-medium">
+                <Flame className="w-3 h-3" />
+                <span>Heating</span>
+              </div>
+            )}
+            {isCooling && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-500 text-xs font-medium">
+                <Snowflake className="w-3 h-3" />
+                <span>Cooling</span>
+              </div>
+            )}
+            {isSatisfied && mode !== 'off' && !isHeating && !isCooling && (
+              <div className="px-2 py-1 rounded-full bg-green-500/20 text-green-500 text-xs font-medium">
+                Target Reached
+              </div>
+            )}
+          </div>
         </div>
       </CardHeader>
 
