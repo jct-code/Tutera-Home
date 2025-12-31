@@ -134,6 +134,16 @@ export function ThermostatZoneControl({
   
   const mainThermostatCount = mainThermostats.length;
   
+  // Count thermostats actively calling for heat or cool
+  const heatingCount = useMemo(() => 
+    mainThermostats.filter(t => t.isHeating).length, 
+    [mainThermostats]
+  );
+  const coolingCount = useMemo(() => 
+    mainThermostats.filter(t => t.isCooling).length, 
+    [mainThermostats]
+  );
+  
   // Check if selected thermostat is floor-heat-only
   const isSelectedFloorHeatOnly = useMemo(() => {
     if (!selectedThermostat) return false;
@@ -313,11 +323,24 @@ export function ThermostatZoneControl({
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
               {zone.name}
             </h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {activeCount > 0 
-                ? `${activeCount} of ${mainThermostatCount} thermostats active`
-                : `${mainThermostatCount} thermostats (all off)`
-              }
+            <p className="text-sm text-[var(--text-secondary)] flex items-center gap-2 flex-wrap">
+              <span>{activeCount} of {mainThermostatCount} thermostats active</span>
+              {(heatingCount > 0 || coolingCount > 0) && (
+                <span className="flex items-center gap-2">
+                  {heatingCount > 0 && (
+                    <span className="flex items-center gap-1 text-red-500">
+                      <Flame className="w-3 h-3" />
+                      <span className="text-xs font-medium">{heatingCount}</span>
+                    </span>
+                  )}
+                  {coolingCount > 0 && (
+                    <span className="flex items-center gap-1 text-blue-500">
+                      <Snowflake className="w-3 h-3" />
+                      <span className="text-xs font-medium">{coolingCount}</span>
+                    </span>
+                  )}
+                </span>
+              )}
             </p>
           </div>
         </div>
