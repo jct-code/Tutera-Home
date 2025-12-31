@@ -4,34 +4,32 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { fetchAllData, useDeviceStore, checkTemperatureSatisfaction } from "@/stores/deviceStore";
 import { useThemeStore, applyTheme } from "@/stores/themeStore";
+import { getPollingSettingsMs, usePollingStore } from "@/stores/pollingStore";
 
-// Adaptive polling intervals based on idle time (in milliseconds)
-const POLLING_INTERVALS = {
-  ACTIVE: 3000,           // 3 seconds when active
-  IDLE_1_MIN: 10000,      // 10 seconds after 1 minute idle
-  IDLE_5_MIN: 60000,      // 1 minute after 5 minutes idle
-  IDLE_10_MIN: 1800000,   // 30 minutes after 10 minutes idle
-};
-
-// Idle time thresholds (in milliseconds)
-const IDLE_THRESHOLDS = {
-  ONE_MINUTE: 60000,
-  FIVE_MINUTES: 300000,
-  TEN_MINUTES: 600000,
-};
-
-// Get the appropriate polling interval based on idle duration
+// Get the appropriate polling interval based on idle duration (using current settings)
 function getPollingInterval(idleDuration: number): number {
-  if (idleDuration >= IDLE_THRESHOLDS.TEN_MINUTES) {
-    return POLLING_INTERVALS.IDLE_10_MIN;
+  const settings = getPollingSettingsMs();
+  
+  if (idleDuration >= settings.thresholds.three) {
+    return settings.intervals.idle10Min;
   }
-  if (idleDuration >= IDLE_THRESHOLDS.FIVE_MINUTES) {
-    return POLLING_INTERVALS.IDLE_5_MIN;
+  if (idleDuration >= settings.thresholds.two) {
+    return settings.intervals.idle5Min;
   }
-  if (idleDuration >= IDLE_THRESHOLDS.ONE_MINUTE) {
-    return POLLING_INTERVALS.IDLE_1_MIN;
+  if (idleDuration >= settings.thresholds.one) {
+    return settings.intervals.idle1Min;
   }
-  return POLLING_INTERVALS.ACTIVE;
+  return settings.intervals.active;
+}
+
+// Get the first idle threshold (used to detect when user was idle)
+function getFirstIdleThreshold(): number {
+  return getPollingSettingsMs().thresholds.one;
+}
+
+// Get the active polling interval
+function getActivePollingInterval(): number {
+  return getPollingSettingsMs().intervals.active;
 }
 
 interface DataProviderProps {
@@ -47,7 +45,7 @@ export function DataProvider({ children }: DataProviderProps) {
   
   // Track last activity time and current polling interval
   const lastActivityRef = useRef<number>(Date.now());
-  const currentIntervalRef = useRef<number>(POLLING_INTERVALS.ACTIVE);
+  const currentIntervalRef = useRef<number>(getActivePollingInterval());
   const isPageVisibleRef = useRef<boolean>(true);
 
   // Suppress Next.js dev overlay async params/searchParams warnings (dev-only, doesn't affect production)
@@ -121,7 +119,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // Handle user activity - reset idle timer and potentially increase polling rate
   const handleActivity = useCallback(() => {
-    const wasIdle = Date.now() - lastActivityRef.current >= IDLE_THRESHOLDS.ONE_MINUTE;
+    const wasIdle = Date.now() - lastActivityRef.current >= getFirstIdleThreshold();
     lastActivityRef.current = Date.now();
     
     // If coming back from idle state, immediately refresh and reset to active polling
@@ -129,8 +127,9 @@ export function DataProvider({ children }: DataProviderProps) {
       // Immediate refresh when becoming active after being idle
       doFetch();
       // Reset to active polling interval
-      if (currentIntervalRef.current !== POLLING_INTERVALS.ACTIVE) {
-        restartPolling(POLLING_INTERVALS.ACTIVE);
+      const activeInterval = getActivePollingInterval();
+      if (currentIntervalRef.current !== activeInterval) {
+        restartPolling(activeInterval);
       }
     }
   }, [doFetch, restartPolling]);
@@ -145,7 +144,7 @@ export function DataProvider({ children }: DataProviderProps) {
       // Page became visible - treat as activity, immediate refresh
       lastActivityRef.current = Date.now();
       doFetch();
-      restartPolling(POLLING_INTERVALS.ACTIVE);
+      restartPolling(getActivePollingInterval());
     } else if (!isVisible) {
       // Page hidden - stop polling entirely to save resources
       if (intervalRef.current) {
@@ -189,12 +188,13 @@ export function DataProvider({ children }: DataProviderProps) {
     }
 
     // Reset activity tracking
+    const activeInterval = getActivePollingInterval();
     lastActivityRef.current = Date.now();
-    currentIntervalRef.current = POLLING_INTERVALS.ACTIVE;
+    currentIntervalRef.current = activeInterval;
     isPageVisibleRef.current = document.visibilityState === 'visible';
 
     // Set up polling interval with silent=true to avoid UI flicker
-    intervalRef.current = setInterval(doFetch, POLLING_INTERVALS.ACTIVE);
+    intervalRef.current = setInterval(doFetch, activeInterval);
 
     // Set up idle state check (runs every 10 seconds to adjust polling as needed)
     idleCheckRef.current = setInterval(checkIdleState, 10000);
