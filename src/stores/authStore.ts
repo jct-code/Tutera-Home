@@ -86,10 +86,12 @@ export const useAuthStore = create<AuthState>()(
       name: "crestron-auth",
       partialize: (state) => ({
         processorIp: state.processorIp,
-        authKey: state.authKey,
-        authToken: state.authToken, // Also persist the auth token for re-login
+        // Don't persist authKey - it may be stale after server restart
+        // authKey: state.authKey,
+        authToken: state.authToken, // Persist the auth token for re-login
         authTokenFromEnv: state.authTokenFromEnv,
-        isConnected: state.isConnected,
+        // Don't persist isConnected - always verify on app load
+        // isConnected: state.isConnected,
       }),
     }
   )

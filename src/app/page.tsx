@@ -34,6 +34,7 @@ import { RoomZoneControl } from "@/components/devices/RoomZoneControl";
 import { MediaRoomCard } from "@/components/devices/MediaRoomCard";
 import { separateLightsAndEquipment } from "@/lib/crestron/types";
 import { QuickActionsBar } from "@/components/layout/QuickActions";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useAuthStore } from "@/stores/authStore";
 import { useDeviceStore, fetchAllData, getRoomsWithStatus, getRoomZonesWithData } from "@/stores/deviceStore";
 import { useWeatherStore, fetchWeather } from "@/stores/weatherStore";
@@ -179,6 +180,7 @@ export default function Dashboard() {
   }
 
   return (
+    <PullToRefresh onRefresh={handleRefresh} disabled={isRefreshing || isLoading}>
     <div className="min-h-screen bg-[var(--background)] pb-20 md:pb-6">
       <Header />
       
@@ -194,7 +196,7 @@ export default function Dashboard() {
           <button
             onClick={handleRefresh}
             disabled={isRefreshing || isLoading}
-            className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
+            className="hidden md:block p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
             <RefreshCw className={`w-5 h-5 text-[var(--text-secondary)] ${isRefreshing || isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -288,11 +290,11 @@ export default function Dashboard() {
                   Manage Virtual Rooms
                 </Link>
               </div>
-              <div className="flex items-center gap-1 p-1 bg-[var(--surface)] rounded-xl">
+              <div className="flex items-center gap-0.5 p-0.5 bg-[var(--surface)] rounded-lg">
                 <button
                   onClick={() => setRoomViewMode("zones")}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+                    flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
                     transition-all duration-200
                     ${roomViewMode === "zones"
                       ? "bg-[var(--accent)] text-white shadow-sm"
@@ -300,13 +302,13 @@ export default function Dashboard() {
                     }
                   `}
                 >
-                  <Layers className="w-4 h-4" />
+                  <Layers className="w-3 h-3" />
                   By Zone
                 </button>
                 <button
                   onClick={() => setRoomViewMode("rooms")}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+                    flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
                     transition-all duration-200
                     ${roomViewMode === "rooms"
                       ? "bg-[var(--accent)] text-white shadow-sm"
@@ -314,7 +316,7 @@ export default function Dashboard() {
                     }
                   `}
                 >
-                  <Building2 className="w-4 h-4" />
+                  <Building2 className="w-3 h-3" />
                   By Room
                 </button>
               </div>
@@ -552,5 +554,6 @@ export default function Dashboard() {
       <QuickActionsBar />
       <BottomNavigation />
     </div>
+    </PullToRefresh>
   );
 }

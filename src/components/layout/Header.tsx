@@ -12,7 +12,6 @@ import {
   Lightbulb,
   Menu,
   X,
-  LogOut,
   Wifi,
   WifiOff,
   Music,
@@ -20,6 +19,8 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { IconButton } from "@/components/ui/Button";
+import { Sparkles } from "lucide-react";
+import { useAI } from "@/components/ai/AIGlobalProvider";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
@@ -33,6 +34,7 @@ export function Header() {
   const pathname = usePathname();
   const { isConnected, processorIp, disconnect } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { openAI } = useAI();
 
   const handleDisconnect = () => {
     disconnect();
@@ -92,7 +94,18 @@ export function Header() {
           </nav>
 
           {/* Right Side */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* AI Button */}
+            {isConnected && (
+              <button
+                onClick={openAI}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent)] to-[#6366f1] text-white shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                title="AI Control (Ctrl+J)"
+              >
+                <Sparkles className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Connection Status - just icon */}
             <div className="hidden sm:flex items-center" title={isConnected ? `Connected: ${processorIp}` : "Disconnected"}>
               {isConnected ? (
@@ -110,15 +123,6 @@ export function Header() {
                 aria-label="Settings"
               />
             </Link>
-
-            {/* Disconnect Button */}
-            <IconButton
-              icon={<LogOut className="w-4 h-4" />}
-              variant="ghost"
-              aria-label="Disconnect"
-              onClick={handleDisconnect}
-              className="hidden sm:flex"
-            />
 
             {/* Mobile Menu Button */}
             <IconButton
@@ -191,11 +195,13 @@ export function Header() {
                   {isConnected ? "Connected" : "Disconnected"}
                 </span>
               </div>
+            </div>
+            <div className="px-4 py-2">
               <button
                 onClick={handleDisconnect}
-                className="text-sm text-[var(--danger)] font-medium"
+                className="w-full py-2 px-4 rounded-lg bg-[var(--surface-hover)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--border)] transition-colors"
               >
-                Disconnect
+                Restart App
               </button>
             </div>
           </nav>

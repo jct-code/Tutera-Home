@@ -17,16 +17,12 @@ export default function LoginPage() {
   const [localError, setLocalError] = useState("");
   const [isAutoConnecting, setIsAutoConnecting] = useState(true);
 
-  // Check for auto-connect on mount
+  // Check for auto-connect on mount - always verify connection even if marked as connected
   useEffect(() => {
-    // If already connected, redirect immediately
-    if (isConnected) {
-      router.push("/");
-      return;
-    }
-
     const checkAutoConnect = async () => {
       try {
+        // Always try to get a fresh auth key from the config endpoint
+        // This handles cases where the server restarted and the old auth key is stale
         const response = await fetch("/api/crestron/config");
         const data = await response.json();
 
@@ -50,7 +46,7 @@ export default function LoginPage() {
     };
 
     checkAutoConnect();
-  }, [isConnected, router, setConnection]);
+  }, [router, setConnection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,10 +192,18 @@ export default function LoginPage() {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
-                className="flex items-center gap-2 p-3 bg-[var(--danger-light)] text-[var(--danger)] rounded-[var(--radius-sm)] text-sm"
+                className="p-3 bg-[var(--danger-light)] rounded-[var(--radius-sm)] text-sm"
               >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{displayError}</span>
+                <div className="flex items-center gap-2 text-[var(--danger)]">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{displayError}</span>
+                </div>
+                {displayError.toLowerCase().includes('timeout') && (
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    💡 If using VPN, try disconnecting and reconnecting it. 
+                    You may also need to restart the Crestron processor.
+                  </p>
+                )}
               </motion.div>
             )}
 

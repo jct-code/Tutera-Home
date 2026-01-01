@@ -11,6 +11,7 @@ import { MediaZoneControl } from "@/components/devices/MediaZoneControl";
 import { MediaRoomCard } from "@/components/devices/MediaRoomCard";
 import { Card } from "@/components/ui/Card";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useAuthStore } from "@/stores/authStore";
 import { 
   useDeviceStore, 
@@ -86,6 +87,7 @@ export default function MediaPage() {
   };
 
   return (
+    <PullToRefresh onRefresh={fetchAllData} disabled={isLoading}>
     <div className="min-h-screen bg-[var(--background)] pb-20 md:pb-6">
       <Header />
       
@@ -106,7 +108,7 @@ export default function MediaPage() {
           <button
             onClick={() => fetchAllData()}
             disabled={isLoading}
-            className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
+            className="hidden md:block p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
           >
             <RefreshCw className={`w-5 h-5 text-[var(--text-secondary)] ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -293,5 +295,6 @@ export default function MediaPage() {
 
       <BottomNavigation />
     </div>
+    </PullToRefresh>
   );
 }

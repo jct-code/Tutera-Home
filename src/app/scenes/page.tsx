@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { SceneCard } from "@/components/devices/SceneCard";
 import { RefreshedAt } from "@/components/ui/RefreshedAt";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Card } from "@/components/ui/Card";
 import { useAuthStore } from "@/stores/authStore";
 import { useDeviceStore, fetchAllData } from "@/stores/deviceStore";
@@ -134,6 +135,7 @@ export default function ScenesPage() {
   if (!isConnected) return null;
 
   return (
+    <PullToRefresh onRefresh={fetchAllData} disabled={isLoading}>
     <div className="min-h-screen bg-[var(--background)] pb-20 md:pb-6">
       <Header />
       
@@ -167,7 +169,7 @@ export default function ScenesPage() {
             <button
               onClick={() => fetchAllData()}
               disabled={isLoading}
-              className="p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
+              className="hidden md:block p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
             >
               <RefreshCw className={`w-5 h-5 text-[var(--text-secondary)] ${isLoading ? "animate-spin" : ""}`} />
             </button>
@@ -285,5 +287,6 @@ export default function ScenesPage() {
 
       <BottomNavigation />
     </div>
+    </PullToRefresh>
   );
 }
