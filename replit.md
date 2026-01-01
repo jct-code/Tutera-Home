@@ -3,6 +3,20 @@
 ## Overview
 A Next.js web application for controlling Crestron Home smart home systems. This dashboard provides an interface for managing lighting, climate, media, security, and scenes through a Crestron Home processor.
 
+## Important: Network Access Requirement
+
+Since Replit runs in the cloud, it cannot directly reach devices on your private home network (like your Crestron processor at 192.168.x.x). 
+
+**Recommended Solution: Cloudflare Tunnel**
+- Set up a Cloudflare Tunnel on an always-on device at home (Raspberry Pi, NAS, etc.)
+- This creates a secure public URL for your Crestron processor
+- On the login page, enter the tunnel hostname instead of the local IP
+- See `docs/remote-access-setup.md` for detailed setup instructions
+
+**Alternative Options:**
+- Tailscale/ZeroTier (mesh VPN) - complex to set up on Replit
+- Run the app locally on a home device instead of cloud hosting
+
 ## Project Structure
 - `src/app/` - Next.js App Router pages and API routes
   - `api/` - Backend API routes for Crestron, AI, weather, and AppleTV
