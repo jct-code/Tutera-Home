@@ -387,15 +387,71 @@ export function generateStatusReport(
   context: DeviceMatchContext
 ): string {
   const parts: string[] = [];
-  const targetDesc = args.room || args.area || "the whole house";
+  const { areas, rooms, lights } = context;
   
-  if (args.device_type === "lights" || args.device_type === "all") {
-    const lights = getMatchingLights(args, context);
-    const lightsOn = lights.filter(l => l.isOn || l.level > 0);
-    parts.push(`Lights: ${lightsOn.length} of ${lights.length} are on in ${targetDesc}.`);
+  // If asking about whole house lights without specific area/room, break down by area
+  if ((args.device_type === "lights" || args.device_type === "all") && !args.area && !args.room) {
+    const allLights = lights;
+    const allLightsOn = allLights.filter(l => l.isOn || l.level > 0);
+    
+    if (allLightsOn.length === 0) {
+      parts.push(`All ${allLights.length} lights in the house are off.`);
+    } else {
+      // Get breakdown by area
+      const areaBreakdown: string[] = [];
+      
+      for (const area of areas) {
+        const areaLights = allLights.filter(l => l.roomId && area.roomIds.includes(l.roomId));
+        const areaLightsOn = areaLights.filter(l => l.isOn || l.level > 0);
+        
+        if (areaLightsOn.length > 0) {
+          // Get the room names where lights are on
+          const roomsWithLightsOn = new Map<string, { name: string; lights: string[] }>();
+          for (const light of areaLightsOn) {
+            const room = rooms.find(r => r.id === light.roomId);
+            if (room) {
+              if (!roomsWithLightsOn.has(room.id)) {
+                roomsWithLightsOn.set(room.id, { name: room.name, lights: [] });
+              }
+              roomsWithLightsOn.get(room.id)!.lights.push(light.name);
+            }
+          }
+          
+          const roomDetails = Array.from(roomsWithLightsOn.values())
+            .map(r => `${r.name} (${r.lights.length})`)
+            .join(", ");
+          
+          areaBreakdown.push(`${area.name}: ${areaLightsOn.length} lights on in ${roomDetails}`);
+        }
+      }
+      
+      parts.push(`${allLightsOn.length} of ${allLights.length} lights are on.`);
+      if (areaBreakdown.length > 0) {
+        parts.push(areaBreakdown.join(". ") + ".");
+      }
+    }
+  } else if (args.device_type === "lights" || args.device_type === "all") {
+    // Specific area or room requested
+    const targetDesc = args.room || args.area || "the whole house";
+    const matchedLights = getMatchingLights(args, context);
+    const lightsOn = matchedLights.filter(l => l.isOn || l.level > 0);
+    
+    if (lightsOn.length === 0) {
+      parts.push(`All ${matchedLights.length} lights in ${targetDesc} are off.`);
+    } else {
+      // List which lights are on
+      const lightNames = lightsOn.slice(0, 5).map(l => l.name);
+      const moreCount = lightsOn.length - 5;
+      let lightList = lightNames.join(", ");
+      if (moreCount > 0) {
+        lightList += ` and ${moreCount} more`;
+      }
+      parts.push(`${lightsOn.length} of ${matchedLights.length} lights are on in ${targetDesc}: ${lightList}.`);
+    }
   }
   
   if (args.device_type === "climate" || args.device_type === "all") {
+    const targetDesc = args.room || args.area || "the house";
     const thermostats = getMatchingThermostats(args, context);
     if (thermostats.length > 0) {
       if (thermostats.length === 1) {
@@ -408,18 +464,15 @@ export function generateStatusReport(
             : t.mode === 'auto'
               ? `heat: ${t.heatSetPoint}°F, cool: ${t.coolSetPoint}°F`
               : 'off';
-        parts.push(`${t.name}: Current temperature is ${t.currentTemp}°F, mode: ${t.mode}, ${setPointInfo}.`);
+        parts.push(`${t.name}: ${t.currentTemp}°F, ${t.mode} mode, ${setPointInfo}.`);
       } else {
         // Multiple thermostats - show average and list
         const avgTemp = Math.round(
           thermostats.reduce((sum, t) => sum + t.currentTemp, 0) / thermostats.length
         );
-        const modes = [...new Set(thermostats.map(t => t.mode))].join(", ");
         const details = thermostats.map(t => `${t.name}: ${t.currentTemp}°F`).join(", ");
-        parts.push(`Climate: Average ${avgTemp}°F (${details}). Modes: ${modes}.`);
+        parts.push(`Average temp in ${targetDesc}: ${avgTemp}°F. ${details}.`);
       }
-    } else {
-      parts.push(`No thermostats found in ${targetDesc}.`);
     }
   }
   
@@ -427,12 +480,11 @@ export function generateStatusReport(
     const mediaRooms = getMatchingMediaRooms(args, context);
     const playing = mediaRooms.filter(m => m.isPoweredOn);
     if (mediaRooms.length > 0) {
-      parts.push(`Media: ${playing.length} of ${mediaRooms.length} rooms are on.`);
-      if (playing.length > 0) {
-        const sources = [...new Set(playing.map(m => m.currentSourceName).filter(Boolean))];
-        if (sources.length > 0) {
-          parts.push(`Playing: ${sources.join(", ")}.`);
-        }
+      if (playing.length === 0) {
+        parts.push(`All ${mediaRooms.length} media rooms are off.`);
+      } else {
+        const playingDetails = playing.map(m => m.name + (m.currentSourceName ? ` (${m.currentSourceName})` : "")).join(", ");
+        parts.push(`${playing.length} media rooms playing: ${playingDetails}.`);
       }
     }
   }

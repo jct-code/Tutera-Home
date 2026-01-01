@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Settings, Sliders, Grid3X3, RotateCcw, Zap, Move } from "lucide-react";
+import { Settings, Sliders, Grid3X3, RotateCcw, Zap, Move, Home, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
 import { Card } from "@/components/ui/Card";
@@ -303,6 +304,32 @@ export default function SettingsPage() {
                 Use the Reset button above to return it to the default position.
               </p>
             </div>
+          </motion.section>
+
+          {/* Room Management */}
+          <motion.section variants={itemVariants}>
+            <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+              Room Management
+            </h2>
+            
+            <Card padding="none">
+              <Link href="/rooms/virtual" className="flex items-center justify-between p-4 hover:bg-[var(--surface-hover)] transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                    <Home className="w-5 h-5 text-[var(--accent)]" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-[var(--text-primary)]">
+                      Manage Virtual Rooms
+                    </h3>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Group rooms together for easier control
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-[var(--text-tertiary)]" />
+              </Link>
+            </Card>
           </motion.section>
 
           {/* API Refresh Settings */}

@@ -496,7 +496,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
                     onKeyDown={handleKeyDown}
                     placeholder={isListening ? "Listening..." : "Type a command..."}
                     disabled={isProcessing || isListening}
-                    className="w-full px-4 py-3 bg-[var(--surface)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
+                    className="w-full px-4 py-4 bg-[var(--surface)] rounded-xl text-lg text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
                   />
                 </div>
                 

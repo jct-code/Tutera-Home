@@ -10,7 +10,6 @@ import {
   Blinds,
   RefreshCw,
   ChevronRight,
-  CloudSun,
   Power,
   Layers,
   Building2,
@@ -207,66 +206,70 @@ export default function Dashboard() {
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
+          className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"
         >
+          {/* Lights On - links to Lighting page */}
           <motion.div variants={itemVariants}>
-            <Card padding="md" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--light-color)]/20 flex items-center justify-center">
-                <Lightbulb className="w-5 h-5 text-[var(--light-color)]" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold">{lightsOn}</p>
-                <p className="text-xs text-[var(--text-secondary)]">Lights On</p>
-              </div>
-            </Card>
+            <Link href="/lighting">
+              <Card padding="md" className="flex items-center gap-3 hover:bg-[var(--surface-hover)] transition-colors cursor-pointer h-full">
+                <div className="w-10 h-10 rounded-xl bg-[var(--light-color)]/20 flex items-center justify-center flex-shrink-0">
+                  <Lightbulb className="w-5 h-5 text-[var(--light-color)]" />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold">{lightsOn}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">Lights On</p>
+                </div>
+              </Card>
+            </Link>
           </motion.div>
 
+          {/* Media - links to Media page */}
           <motion.div variants={itemVariants}>
-            <Card padding="md" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--climate-color)]/20 flex items-center justify-center">
-                <Thermometer className="w-5 h-5 text-[var(--climate-color)]" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold">
-                  {thermostats[0]?.currentTemp || "--"}°
-                </p>
-                <p className="text-xs text-[var(--text-secondary)]">Inside</p>
-              </div>
-            </Card>
+            <Link href="/media">
+              <Card padding="md" className="flex items-center gap-3 hover:bg-[var(--surface-hover)] transition-colors cursor-pointer h-full">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  mediaRoomsPlaying > 0 ? "bg-purple-500/20" : "bg-slate-400/20"
+                }`}>
+                  <Music className={`w-5 h-5 ${
+                    mediaRoomsPlaying > 0 ? "text-purple-500" : "text-slate-400"
+                  }`} />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold">
+                    {mediaRoomsPlaying}
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    {mediaRoomsPlaying === 1 ? "Playing" : "Playing"}
+                  </p>
+                </div>
+              </Card>
+            </Link>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <Card padding="md" className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                unlockedDoors > 0 ? "bg-[var(--danger)]/20" : "bg-[var(--success)]/20"
-              }`}>
-                <Shield className={`w-5 h-5 ${
-                  unlockedDoors > 0 ? "text-[var(--danger)]" : "text-[var(--success)]"
-                }`} />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold">
-                  {unlockedDoors > 0 ? unlockedDoors : "✓"}
-                </p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  {unlockedDoors > 0 ? "Unlocked" : "Secured"}
-                </p>
-              </div>
-            </Card>
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <Card padding="md" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
-                <CloudSun className="w-5 h-5 text-sky-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold">
-                  {outsideTemp !== null ? `${outsideTemp}°` : "--°"}
-                </p>
-                <p className="text-xs text-[var(--text-secondary)]">Outside</p>
-              </div>
-            </Card>
+          {/* Temperature (Inside & Outside merged) - links to Climate page */}
+          <motion.div variants={itemVariants} className="col-span-2 sm:col-span-1">
+            <Link href="/climate">
+              <Card padding="md" className="flex items-center justify-center gap-4 hover:bg-[var(--surface-hover)] transition-colors cursor-pointer h-full">
+                <div className="w-10 h-10 rounded-xl bg-[var(--climate-color)]/20 flex items-center justify-center flex-shrink-0">
+                  <Thermometer className="w-5 h-5 text-[var(--climate-color)]" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-semibold">
+                      {thermostats[0]?.currentTemp || "--"}°
+                    </p>
+                    <p className="text-xs text-[var(--text-secondary)]">Inside</p>
+                  </div>
+                  <div className="w-px h-8 bg-[var(--border)]"></div>
+                  <div className="text-center">
+                    <p className="text-2xl font-semibold text-sky-500">
+                      {outsideTemp !== null ? `${outsideTemp}°` : "--°"}
+                    </p>
+                    <p className="text-xs text-[var(--text-secondary)]">Outside</p>
+                  </div>
+                </div>
+              </Card>
+            </Link>
           </motion.div>
         </motion.div>
 
@@ -279,45 +282,37 @@ export default function Dashboard() {
             className="mb-4"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                  Rooms
-                </h2>
-                <Link
-                  href="/rooms/virtual"
-                  className="text-sm text-[var(--accent)] hover:text-[var(--accent)]/80 hover:underline transition-colors"
-                >
-                  Manage Virtual Rooms
-                </Link>
-              </div>
-              <div className="flex items-center gap-0.5 p-0.5 bg-[var(--surface)] rounded-lg">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Rooms
+              </h2>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setRoomViewMode("zones")}
                   className={`
-                    flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
+                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
                     transition-all duration-200
                     ${roomViewMode === "zones"
                       ? "bg-[var(--accent)] text-white shadow-sm"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
+                      : "bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
                     }
                   `}
                 >
-                  <Layers className="w-3 h-3" />
-                  By Zone
+                  <Layers className="w-4 h-4" />
+                  Zone
                 </button>
                 <button
                   onClick={() => setRoomViewMode("rooms")}
                   className={`
-                    flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
+                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
                     transition-all duration-200
                     ${roomViewMode === "rooms"
                       ? "bg-[var(--accent)] text-white shadow-sm"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
+                      : "bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
                     }
                   `}
                 >
-                  <Building2 className="w-3 h-3" />
-                  By Room
+                  <Building2 className="w-4 h-4" />
+                  Room
                 </button>
               </div>
             </div>
