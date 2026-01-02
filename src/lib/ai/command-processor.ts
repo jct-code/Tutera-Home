@@ -381,6 +381,7 @@ export function generateMediaResponse(
 
 /**
  * Generate status report for devices
+ * Uses newlines between sections for better readability
  */
 export function generateStatusReport(
   args: StatusArgs,
@@ -397,9 +398,9 @@ export function generateStatusReport(
     if (allLightsOn.length === 0) {
       parts.push(`All ${allLights.length} lights in the house are off.`);
     } else {
-      // Get breakdown by area
-      const areaBreakdown: string[] = [];
+      parts.push(`${allLightsOn.length} of ${allLights.length} lights are on:`);
       
+      // Get breakdown by area - each on its own line
       for (const area of areas) {
         const areaLights = allLights.filter(l => l.roomId && area.roomIds.includes(l.roomId));
         const areaLightsOn = areaLights.filter(l => l.isOn || l.level > 0);
@@ -421,13 +422,8 @@ export function generateStatusReport(
             .map(r => `${r.name} (${r.lights.length})`)
             .join(", ");
           
-          areaBreakdown.push(`${area.name}: ${areaLightsOn.length} lights on in ${roomDetails}`);
+          parts.push(`• ${area.name}: ${areaLightsOn.length} lights - ${roomDetails}`);
         }
-      }
-      
-      parts.push(`${allLightsOn.length} of ${allLights.length} lights are on.`);
-      if (areaBreakdown.length > 0) {
-        parts.push(areaBreakdown.join(". ") + ".");
       }
     }
   } else if (args.device_type === "lights" || args.device_type === "all") {
@@ -439,14 +435,16 @@ export function generateStatusReport(
     if (lightsOn.length === 0) {
       parts.push(`All ${matchedLights.length} lights in ${targetDesc} are off.`);
     } else {
-      // List which lights are on
-      const lightNames = lightsOn.slice(0, 5).map(l => l.name);
-      const moreCount = lightsOn.length - 5;
-      let lightList = lightNames.join(", ");
-      if (moreCount > 0) {
-        lightList += ` and ${moreCount} more`;
+      parts.push(`${lightsOn.length} of ${matchedLights.length} lights on in ${targetDesc}:`);
+      // List lights on separate lines (up to 10)
+      const lightsToShow = lightsOn.slice(0, 10);
+      for (const light of lightsToShow) {
+        const brightness = light.level > 0 ? Math.round((light.level / 65535) * 100) : 100;
+        parts.push(`• ${light.name} (${brightness}%)`);
       }
-      parts.push(`${lightsOn.length} of ${matchedLights.length} lights are on in ${targetDesc}: ${lightList}.`);
+      if (lightsOn.length > 10) {
+        parts.push(`• ...and ${lightsOn.length - 10} more`);
+      }
     }
   }
   
@@ -464,14 +462,16 @@ export function generateStatusReport(
             : t.mode === 'auto'
               ? `heat: ${t.heatSetPoint}°F, cool: ${t.coolSetPoint}°F`
               : 'off';
-        parts.push(`${t.name}: ${t.currentTemp}°F, ${t.mode} mode, ${setPointInfo}.`);
+        parts.push(`${t.name}: ${t.currentTemp}°F, ${t.mode} mode, ${setPointInfo}`);
       } else {
-        // Multiple thermostats - show average and list
+        // Multiple thermostats - each on its own line
         const avgTemp = Math.round(
           thermostats.reduce((sum, t) => sum + t.currentTemp, 0) / thermostats.length
         );
-        const details = thermostats.map(t => `${t.name}: ${t.currentTemp}°F`).join(", ");
-        parts.push(`Average temp in ${targetDesc}: ${avgTemp}°F. ${details}.`);
+        parts.push(`Climate in ${targetDesc} (avg ${avgTemp}°F):`);
+        for (const t of thermostats) {
+          parts.push(`• ${t.name}: ${t.currentTemp}°F (${t.mode})`);
+        }
       }
     }
   }
@@ -483,13 +483,16 @@ export function generateStatusReport(
       if (playing.length === 0) {
         parts.push(`All ${mediaRooms.length} media rooms are off.`);
       } else {
-        const playingDetails = playing.map(m => m.name + (m.currentSourceName ? ` (${m.currentSourceName})` : "")).join(", ");
-        parts.push(`${playing.length} media rooms playing: ${playingDetails}.`);
+        parts.push(`${playing.length} media rooms playing:`);
+        for (const m of playing) {
+          const source = m.currentSourceName ? ` - ${m.currentSourceName}` : "";
+          parts.push(`• ${m.name}${source}`);
+        }
       }
     }
   }
   
-  return parts.join(" ");
+  return parts.join("\n");
 }
 
 /**

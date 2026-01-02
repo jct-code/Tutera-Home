@@ -429,7 +429,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
                           : "bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-bl-md"
                       }`}
                     >
-                      <p className="text-sm">{item.content}</p>
+                      <p className="text-sm whitespace-pre-wrap">{item.content}</p>
                       {item.type === "assistant" && item.canUndo && item.commandStoreId && (
                         <button
                           onClick={() => handleUndo(item.commandStoreId!, item.id)}
