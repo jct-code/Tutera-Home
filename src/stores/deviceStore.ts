@@ -288,7 +288,40 @@ export async function fetchAllData(isRetryAfterRefresh = false, silent = false) 
       fetch("/api/crestron/audio-zones", { cache: 'no-store' }).then(res => res.json()),
     ]);
     
-    // Check if all responses indicate potential auth failure (empty data or errors)
+    // Check if responses indicate explicit auth failure (success: false with auth-related error)
+    // Only trigger auth refresh on EXPLICIT auth failures, not on empty data
+    // Empty data can happen due to network glitches or slow responses
+    const hasExplicitAuthError = 
+      (areasData.success === false && areasData.error?.toLowerCase().includes('auth')) ||
+      (roomsData.success === false && roomsData.error?.toLowerCase().includes('auth')) ||
+      (devicesData.success === false && devicesData.error?.toLowerCase().includes('auth')) ||
+      (scenesData.success === false && scenesData.error?.toLowerCase().includes('auth'));
+    
+    // Check if ALL endpoints returned success: false (not just empty data)
+    const allFailed = 
+      areasData.success === false && 
+      roomsData.success === false && 
+      devicesData.success === false && 
+      scenesData.success === false;
+    
+    // Only attempt auth refresh on explicit auth errors OR if ALL endpoints failed
+    // Silent polling should NEVER trigger auth refresh to prevent mid-action logouts
+    if ((hasExplicitAuthError || allFailed) && !isRetryAfterRefresh && !isRefreshingAuth && !silent) {
+      isRefreshingAuth = true;
+      store.setLoading(false);
+      
+      const refreshSuccess = await refreshAuth();
+      isRefreshingAuth = false;
+      
+      if (refreshSuccess) {
+        return fetchAllData(true, silent);
+      } else {
+        store.setError("Session expired. Please log in again.");
+        return;
+      }
+    }
+    
+    // Extract arrays for processing
     const areasArray = areasData.success 
       ? (Array.isArray(areasData.data) ? areasData.data : areasData.data?.areas || [])
       : [];
@@ -297,28 +330,6 @@ export async function fetchAllData(isRetryAfterRefresh = false, silent = false) 
       : [];
     const lightsArray = devicesData.success && devicesData.data?.lights || [];
     const scenesArray = scenesData.success ? (Array.isArray(scenesData.data) ? scenesData.data : []) : [];
-    
-    // Detect auth failure: if we get empty data from ALL endpoints, auth likely expired
-    const allEmpty = areasArray.length === 0 && roomsArray.length === 0 && lightsArray.length === 0 && scenesArray.length === 0;
-    
-    // If all data is empty and we haven't already tried refreshing, attempt to refresh auth
-    if (allEmpty && !isRetryAfterRefresh && !isRefreshingAuth) {
-      isRefreshingAuth = true;
-      if (!silent) {
-        store.setLoading(false); // Release loading lock for refresh
-      }
-      
-      const refreshSuccess = await refreshAuth();
-      isRefreshingAuth = false;
-      
-      if (refreshSuccess) {
-        // Retry fetch with new auth, preserving silent flag
-        return fetchAllData(true, silent);
-      } else {
-        store.setError("Session expired. Please log in again.");
-        return;
-      }
-    }
     
     // Process areas and rooms together - Crestron areas may include rooms, or rooms may have areaId
     interface TransformedArea {
