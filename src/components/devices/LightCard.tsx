@@ -49,6 +49,9 @@ export function percentToLevel(percent: number): number {
   return Math.round((percent / 100) * 65535);
 }
 
+// Hold delay in milliseconds before slider activates (prevents accidental touches while scrolling)
+const HOLD_DELAY_MS = 200;
+
 // Shared swipeable light control hook
 export function useSwipeControl(options: {
   currentPercent: number;
@@ -60,9 +63,12 @@ export function useSwipeControl(options: {
 }) {
   const { currentPercent, isOn, isDimmer, onLevelChange, onToggle, isUpdating } = options;
   const [isDragging, setIsDragging] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
   const [dragPercent, setDragPercent] = useState<number | null>(null);
   const [startX, setStartX] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingPointerRef = useRef<{ clientX: number; pointerId: number; target: HTMLElement } | null>(null);
 
   // Calculate percentage from absolute position within the card
   const calculatePercentFromPosition = useCallback((clientX: number): number => {
@@ -75,6 +81,15 @@ export function useSwipeControl(options: {
     return Math.max(0, Math.min(100, Math.round(percent)));
   }, [currentPercent]);
 
+  // Clear hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (isUpdating) return;
     // Don't start dragging if clicking on interactive elements
@@ -82,19 +97,49 @@ export function useSwipeControl(options: {
     if (target.closest('button') || target.closest('[role="button"]')) {
       return;
     }
-    setIsDragging(true);
+    
+    // Store pending pointer info and start hold timer
+    pendingPointerRef.current = { 
+      clientX: e.clientX, 
+      pointerId: e.pointerId, 
+      target: e.target as HTMLElement 
+    };
+    setIsHolding(true);
     setStartX(e.clientX);
-    // For dimmers, immediately calculate percent from click position
-    if (isDimmer) {
-      const clickPercent = calculatePercentFromPosition(e.clientX);
-      setDragPercent(clickPercent);
-    } else {
-      setDragPercent(currentPercent);
-    }
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
+    // Start hold timer - only activate dragging after delay
+    holdTimerRef.current = setTimeout(() => {
+      if (pendingPointerRef.current) {
+        setIsDragging(true);
+        // For dimmers, calculate percent from click position
+        if (isDimmer) {
+          const clickPercent = calculatePercentFromPosition(pendingPointerRef.current.clientX);
+          setDragPercent(clickPercent);
+        } else {
+          setDragPercent(currentPercent);
+        }
+        pendingPointerRef.current.target.setPointerCapture(pendingPointerRef.current.pointerId);
+      }
+    }, HOLD_DELAY_MS);
   }, [isUpdating, currentPercent, isDimmer, calculatePercentFromPosition]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    // If still in hold phase (before delay), check if user is scrolling
+    if (isHolding && !isDragging) {
+      const deltaX = Math.abs(e.clientX - startX);
+      const deltaY = Math.abs(e.clientY - (pendingPointerRef.current?.clientX || 0));
+      // If moved more than 10px, cancel the hold (user is scrolling)
+      if (deltaX > 10 || deltaY > 10) {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        setIsHolding(false);
+        pendingPointerRef.current = null;
+      }
+      return;
+    }
+    
     if (!isDragging || isUpdating) return;
     
     if (isDimmer) {
@@ -110,11 +155,23 @@ export function useSwipeControl(options: {
       const newPercent = Math.max(0, Math.min(100, basePercent + percentChange));
       setDragPercent(Math.round(newPercent));
     }
-  }, [isDragging, isUpdating, isDimmer, startX, currentPercent, dragPercent, calculatePercentFromPosition]);
+  }, [isDragging, isHolding, isUpdating, isDimmer, startX, currentPercent, dragPercent, calculatePercentFromPosition]);
 
   const handlePointerUp = useCallback(async (e: React.PointerEvent) => {
+    // Clear hold timer if still pending
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    setIsHolding(false);
+    pendingPointerRef.current = null;
+    
     if (!isDragging) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore if capture wasn't set
+    }
     
     if (isDimmer) {
       // For dimmers: use the dragPercent value directly (updated during drag)
@@ -510,9 +567,12 @@ interface LightGroupControlProps {
 export function LightGroupControl({ lights, roomName, standalone = true }: LightGroupControlProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
   const [dragPercent, setDragPercent] = useState<number | null>(null);
   const [startX, setStartX] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingPointerRef = useRef<{ clientX: number; pointerId: number; target: HTMLElement } | null>(null);
   
   const onCount = lights.filter(l => l.isOn || l.level > 0).length;
   const totalLights = lights.length;
@@ -525,6 +585,15 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
   }, [lights, totalLights]);
   
   const isOn = onCount > 0;
+
+  // Clear hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleAllLights = useCallback(async (targetPercent: number) => {
     setIsUpdating(true);
@@ -539,13 +608,42 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (isUpdating || !standalone) return;
-    setIsDragging(true);
+    
+    // Store pending pointer info and start hold timer
+    pendingPointerRef.current = { 
+      clientX: e.clientX, 
+      pointerId: e.pointerId, 
+      target: e.target as HTMLElement 
+    };
+    setIsHolding(true);
     setStartX(e.clientX);
-    setDragPercent(avgPercent);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
+    // Start hold timer - only activate dragging after delay
+    holdTimerRef.current = setTimeout(() => {
+      if (pendingPointerRef.current) {
+        setIsDragging(true);
+        setDragPercent(avgPercent);
+        pendingPointerRef.current.target.setPointerCapture(pendingPointerRef.current.pointerId);
+      }
+    }, HOLD_DELAY_MS);
   }, [isUpdating, avgPercent, standalone]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    // If still in hold phase (before delay), check if user is scrolling
+    if (isHolding && !isDragging) {
+      const deltaX = Math.abs(e.clientX - startX);
+      // If moved more than 10px, cancel the hold (user is scrolling)
+      if (deltaX > 10) {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        setIsHolding(false);
+        pendingPointerRef.current = null;
+      }
+      return;
+    }
+    
     if (!isDragging || isUpdating) return;
     
     const cardWidth = cardRef.current?.offsetWidth || 300;
@@ -553,11 +651,23 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
     const percentChange = (deltaX / cardWidth) * 100;
     const newPercent = Math.max(0, Math.min(100, avgPercent + percentChange));
     setDragPercent(Math.round(newPercent));
-  }, [isDragging, isUpdating, startX, avgPercent]);
+  }, [isDragging, isHolding, isUpdating, startX, avgPercent]);
 
   const handlePointerUp = useCallback(async (e: React.PointerEvent) => {
+    // Clear hold timer if still pending
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    setIsHolding(false);
+    pendingPointerRef.current = null;
+    
     if (!isDragging) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore if capture wasn't set
+    }
     
     const cardWidth = cardRef.current?.offsetWidth || 300;
     const deltaX = e.clientX - startX;
