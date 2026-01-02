@@ -27,23 +27,25 @@ export function useAI() {
  */
 export function AIGlobalProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
+
+  const canAccessAI = isConnected || isRefreshingAuth;
 
   const openAI = useCallback(() => {
-    if (isConnected) {
+    if (canAccessAI) {
       setIsOpen(true);
     }
-  }, [isConnected]);
+  }, [canAccessAI]);
 
   const closeAI = useCallback(() => {
     setIsOpen(false);
   }, []);
 
   const toggleAI = useCallback(() => {
-    if (isConnected) {
+    if (canAccessAI) {
       setIsOpen(prev => !prev);
     }
-  }, [isConnected]);
+  }, [canAccessAI]);
 
   // Global keyboard shortcut (Ctrl/Cmd + J)
   useEffect(() => {
@@ -61,7 +63,7 @@ export function AIGlobalProvider({ children }: { children: React.ReactNode }) {
   return (
     <AIContext.Provider value={{ openAI, closeAI, toggleAI, isOpen }}>
       {children}
-      {isConnected && (
+      {canAccessAI && (
         <AICommandModal isOpen={isOpen} onClose={closeAI} />
       )}
     </AIContext.Provider>

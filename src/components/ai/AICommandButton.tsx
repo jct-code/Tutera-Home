@@ -13,7 +13,9 @@ import { useAuthStore } from "@/stores/authStore";
 export function AICommandButton() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
+
+  const canAccessAI = isConnected || isRefreshingAuth;
 
   // Handle keyboard shortcut (Ctrl/Cmd + J to open)
   useEffect(() => {
@@ -28,8 +30,8 @@ export function AICommandButton() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Don't render if not connected
-  if (!isConnected) {
+  // Don't render if not connected and not refreshing auth
+  if (!canAccessAI) {
     return null;
   }
 
