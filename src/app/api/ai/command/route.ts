@@ -66,6 +66,38 @@ function extractArray<T>(data: unknown, key: string): T[] {
   return [];
 }
 
+// Raw Crestron room format (id may be number or string)
+interface RawCrestronRoom {
+  id: number | string;
+  name: string;
+  areaId?: number | string;
+}
+
+// Transform raw Crestron room to ensure string IDs
+function transformRoom(r: RawCrestronRoom): Room {
+  return {
+    id: String(r.id),
+    name: r.name,
+    areaId: r.areaId ? String(r.areaId) : undefined,
+  };
+}
+
+// Raw Crestron area format (id may be number or string)
+interface RawCrestronArea {
+  id: number | string;
+  name: string;
+  roomIds?: (number | string)[];
+}
+
+// Transform raw Crestron area to ensure string IDs
+function transformArea(a: RawCrestronArea): Area {
+  return {
+    id: String(a.id),
+    name: a.name,
+    roomIds: a.roomIds ? a.roomIds.map(id => String(id)) : [],
+  };
+}
+
 // Raw Crestron light format
 interface RawCrestronLight {
   id: number;
@@ -163,9 +195,16 @@ async function fetchDeviceState(client: CrestronClient) {
   );
   const thermostats = rawThermostats.map(transformThermostat);
 
+  // Extract and transform rooms/areas to ensure string IDs (fixes type mismatch with light.roomId)
+  const rawRooms = extractArray<RawCrestronRoom>(roomsRes.success ? roomsRes.data : [], 'rooms');
+  const rooms = rawRooms.map(transformRoom);
+  
+  const rawAreas = extractArray<RawCrestronArea>(areasRes.success ? areasRes.data : [], 'areas');
+  const areas = rawAreas.map(transformArea);
+
   return {
-    areas: extractArray<Area>(areasRes.success ? areasRes.data : [], 'areas'),
-    rooms: extractArray<Room>(roomsRes.success ? roomsRes.data : [], 'rooms'),
+    areas,
+    rooms,
     lights,
     thermostats,
     mediaRooms: extractArray<MediaRoom>(mediaRoomsRes.success ? mediaRoomsRes.data : [], 'mediaRooms'),
