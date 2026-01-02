@@ -25,7 +25,6 @@ const navItems = [
   { href: "/climate", label: "Climate", icon: Thermometer },
   { href: "/lighting", label: "Lighting", icon: Lightbulb },
   { href: "/media", label: "Media", icon: Music },
-  { href: "/security", label: "Security", icon: Shield },
 ];
 
 export function BottomNavigation() {
