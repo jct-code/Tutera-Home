@@ -459,20 +459,6 @@ export function generateStatusReport(
       }
     }
     
-    // DEBUG: Add diagnostic info (remove after debugging)
-    const debugInfo: string[] = [];
-    debugInfo.push(`\n[DEBUG] Room/Area IDs - rooms: ${rooms.slice(0, 5).map(r => `${r.name}:${r.id}(${typeof r.id})`).join(", ")}`);
-    const sampleLights = lights.slice(0, 5);
-    debugInfo.push(`[DEBUG] Sample lights: ${sampleLights.map((l: Light) => `${l.name}:roomId=${l.roomId}(${typeof l.roomId}),level=${l.level}`).join(" | ")}`);
-    if (args.room) {
-      const matchingRoom = rooms.find(r => r.name.toLowerCase().includes(args.room!.toLowerCase()));
-      debugInfo.push(`[DEBUG] Looking for room "${args.room}" - found: ${matchingRoom ? `${matchingRoom.name}(id:${matchingRoom.id})` : "none"}`);
-      if (matchingRoom) {
-        const roomLights = lights.filter((l: Light) => l.roomId === matchingRoom.id);
-        debugInfo.push(`[DEBUG] Lights with matching roomId: ${roomLights.length} - ${roomLights.map((l: Light) => `${l.name}(lvl:${l.level})`).join(", ")}`);
-      }
-    }
-    parts.push(...debugInfo);
   }
   
   if (args.device_type === "climate" || args.device_type === "all") {
