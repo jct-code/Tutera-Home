@@ -359,6 +359,37 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
     }
   };
 
+  const formatMessage = (content: string) => {
+    const lines = content.split('\n');
+    return lines.map((line, index) => {
+      const isBullet = line.trim().startsWith('•');
+      const isHeader = line.includes(':') && !isBullet && index === 0;
+      
+      if (isBullet) {
+        return (
+          <div key={index} className="flex items-start gap-2 py-1">
+            <span className="text-[var(--accent)] mt-0.5">•</span>
+            <span>{line.replace('•', '').trim()}</span>
+          </div>
+        );
+      }
+      
+      if (isHeader) {
+        return (
+          <div key={index} className="font-semibold text-base mb-2">
+            {line}
+          </div>
+        );
+      }
+      
+      return (
+        <div key={index} className={index > 0 ? 'mt-1' : ''}>
+          {line}
+        </div>
+      );
+    });
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -368,53 +399,66 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50"
             onClick={onClose}
           />
           
-          {/* Modal */}
+          {/* Floating Webpage Panel */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.9, y: 40 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed top-32 left-4 right-4 md:left-auto md:right-6 md:w-[420px] bg-[var(--surface)] rounded-2xl shadow-2xl border border-[var(--border-light)] z-50 overflow-hidden"
+            exit={{ opacity: 0, scale: 0.9, y: 40 }}
+            transition={{ type: "spring", damping: 20, stiffness: 200 }}
+            className="fixed inset-4 md:inset-auto md:top-8 md:bottom-8 md:left-1/2 md:-translate-x-1/2 md:w-[600px] lg:w-[700px] bg-[var(--background)] rounded-3xl shadow-2xl border border-[var(--border-light)] z-50 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] bg-gradient-to-r from-[var(--accent)]/10 to-transparent">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)] bg-gradient-to-r from-[var(--accent)]/15 via-[var(--accent)]/5 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent)]/70 flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm">
+                  <h2 className="font-bold text-[var(--text-primary)] text-xl">
                     AI Home Control
-                  </h3>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    Say or type a command
+                  </h2>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Control your home with natural language
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-[var(--surface-hover)] transition-colors"
+                className="p-3 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
               >
-                <X className="w-5 h-5 text-[var(--text-secondary)]" />
+                <X className="w-6 h-6 text-[var(--text-secondary)]" />
               </button>
             </div>
             
-            {/* Conversation Area */}
+            {/* Conversation Area - Flexible height */}
             <div
               ref={conversationRef}
-              className="h-[280px] overflow-y-auto p-4 space-y-3"
+              className="flex-1 overflow-y-auto p-6 space-y-4"
             >
               {conversation.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center text-[var(--text-secondary)]">
-                  <MessageSquare className="w-12 h-12 mb-3 opacity-30" />
-                  <p className="text-sm font-medium">No commands yet</p>
-                  <p className="text-xs mt-1 max-w-[280px]">
-                    Try saying "Turn off the lights on the 2nd floor" or "Set the living room to 72 degrees"
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="w-20 h-20 rounded-full bg-[var(--surface)] flex items-center justify-center mb-4">
+                    <MessageSquare className="w-10 h-10 text-[var(--text-secondary)] opacity-40" />
+                  </div>
+                  <p className="text-lg font-medium text-[var(--text-primary)]">Start a conversation</p>
+                  <p className="text-base text-[var(--text-secondary)] mt-2 max-w-[400px]">
+                    Ask me to control your lights, adjust the temperature, or check the status of your home.
                   </p>
+                  <div className="mt-6 flex flex-wrap justify-center gap-2">
+                    <span className="px-3 py-1.5 bg-[var(--surface)] rounded-full text-sm text-[var(--text-secondary)]">
+                      "Turn off 2nd floor lights"
+                    </span>
+                    <span className="px-3 py-1.5 bg-[var(--surface)] rounded-full text-sm text-[var(--text-secondary)]">
+                      "Set living room to 72°"
+                    </span>
+                    <span className="px-3 py-1.5 bg-[var(--surface)] rounded-full text-sm text-[var(--text-secondary)]">
+                      "What's on?"
+                    </span>
+                  </div>
                 </div>
               ) : (
                 conversation.map((item) => (
@@ -423,21 +467,23 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
                     className={`flex ${item.type === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-2 ${
+                      className={`max-w-[90%] md:max-w-[80%] rounded-2xl px-5 py-4 ${
                         item.type === "user"
-                          ? "bg-[var(--accent)] text-white rounded-br-md"
-                          : "bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-bl-md"
+                          ? "bg-[var(--accent)] text-white rounded-br-lg"
+                          : "bg-[var(--surface)] text-[var(--text-primary)] rounded-bl-lg border border-[var(--border-light)]"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{item.content}</p>
+                      <div className="text-base leading-relaxed">
+                        {item.type === "assistant" ? formatMessage(item.content) : item.content}
+                      </div>
                       {item.type === "assistant" && item.canUndo && item.commandStoreId && (
                         <button
                           onClick={() => handleUndo(item.commandStoreId!, item.id)}
                           disabled={isProcessing}
-                          className="mt-2 flex items-center gap-1 text-xs text-[var(--accent)] hover:underline disabled:opacity-50"
+                          className="mt-3 flex items-center gap-1.5 text-sm text-[var(--accent)] hover:underline disabled:opacity-50 font-medium"
                         >
-                          <RotateCcw className="w-3 h-3" />
-                          Undo
+                          <RotateCcw className="w-4 h-4" />
+                          Undo this action
                         </button>
                       )}
                     </div>
@@ -448,11 +494,11 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
               {/* Processing indicator */}
               {isProcessing && (
                 <div className="flex justify-start">
-                  <div className="bg-[var(--surface-hover)] rounded-2xl rounded-bl-md px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />
-                      <span className="text-sm text-[var(--text-secondary)]">
-                        Processing...
+                  <div className="bg-[var(--surface)] border border-[var(--border-light)] rounded-2xl rounded-bl-lg px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-[var(--accent)]" />
+                      <span className="text-base text-[var(--text-secondary)]">
+                        Processing your request...
                       </span>
                     </div>
                   </div>
@@ -462,8 +508,8 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
               {/* Interim transcript */}
               {interimTranscript && (
                 <div className="flex justify-end">
-                  <div className="bg-[var(--accent)]/50 text-white rounded-2xl rounded-br-md px-4 py-2 italic">
-                    <p className="text-sm">{interimTranscript}...</p>
+                  <div className="bg-[var(--accent)]/60 text-white rounded-2xl rounded-br-lg px-5 py-4 italic">
+                    <p className="text-base">{interimTranscript}...</p>
                   </div>
                 </div>
               )}
@@ -471,33 +517,33 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
             
             {/* Error display */}
             {error && (
-              <div className="px-4 py-2 bg-[var(--danger)]/10 border-t border-[var(--danger)]/20">
-                <div className="flex items-center gap-2 text-[var(--danger)] text-sm">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <div className="px-6 py-3 bg-[var(--danger)]/10 border-t border-[var(--danger)]/20">
+                <div className="flex items-center gap-3 text-[var(--danger)] text-base">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
                   <span>{error}</span>
                 </div>
               </div>
             )}
             
             {/* Input Area */}
-            <div className="p-4 border-t border-[var(--border-light)] bg-[var(--background)]">
-              <div className="flex items-center gap-2">
+            <div className="p-6 border-t border-[var(--border-light)] bg-[var(--surface)]">
+              <div className="flex items-center gap-3">
                 {/* Voice button */}
                 {speechSupported && (
                   <button
                     onClick={toggleListening}
                     disabled={isProcessing}
-                    className={`p-3 rounded-xl transition-all ${
+                    className={`p-4 rounded-2xl transition-all ${
                       isListening
-                        ? "bg-[var(--danger)] text-white animate-pulse"
-                        : "bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)]"
+                        ? "bg-[var(--danger)] text-white animate-pulse shadow-lg"
+                        : "bg-[var(--background)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] border border-[var(--border-light)]"
                     } disabled:opacity-50`}
                     title={isListening ? "Stop listening" : "Start voice input"}
                   >
                     {isListening ? (
-                      <MicOff className="w-5 h-5" />
+                      <MicOff className="w-6 h-6" />
                     ) : (
-                      <Mic className="w-5 h-5" />
+                      <Mic className="w-6 h-6" />
                     )}
                   </button>
                 )}
@@ -512,7 +558,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
                     onKeyDown={handleKeyDown}
                     placeholder={isListening ? "Listening..." : "Type a command..."}
                     disabled={isProcessing || isListening}
-                    className="w-full px-4 py-4 bg-[var(--surface)] rounded-xl text-lg text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
+                    className="w-full px-5 py-4 bg-[var(--background)] border border-[var(--border-light)] rounded-2xl text-lg text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] disabled:opacity-50 transition-all"
                   />
                 </div>
                 
@@ -520,14 +566,14 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
                 <button
                   onClick={() => handleSubmit()}
                   disabled={!input.trim() || isProcessing}
-                  className="p-3 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-4 rounded-2xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                 >
-                  <Send className="w-5 h-5" />
+                  <Send className="w-6 h-6" />
                 </button>
               </div>
               
-              {/* Quick suggestions - dynamic based on context and usage */}
-              <div className="flex flex-wrap gap-2 mt-3">
+              {/* Quick suggestions */}
+              <div className="flex flex-wrap gap-2 mt-4">
                 {suggestions.map((suggestion) => (
                   <button
                     key={suggestion}
@@ -536,7 +582,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
                       handleSubmit(suggestion);
                     }}
                     disabled={isProcessing}
-                    className="px-3 py-1.5 text-xs bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] rounded-full transition-colors disabled:opacity-50"
+                    className="px-4 py-2 text-sm bg-[var(--background)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-full border border-[var(--border-light)] transition-all disabled:opacity-50"
                   >
                     {suggestion}
                   </button>
