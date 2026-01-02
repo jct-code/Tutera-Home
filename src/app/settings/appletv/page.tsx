@@ -48,7 +48,7 @@ const itemVariants = {
 export default function AppleTVPairingPage() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   
   // State
   const [devices, setDevices] = useState<AppleTVDevice[]>([]);
@@ -63,10 +63,10 @@ export default function AppleTVPairingPage() {
   }, []);
 
   useEffect(() => {
-    if (isMounted && !isConnected) {
+    if (isMounted && !isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router, isMounted]);
+  }, [isConnected, isRefreshingAuth, router, isMounted]);
 
   // Scan for Apple TVs
   const scanForDevices = async () => {

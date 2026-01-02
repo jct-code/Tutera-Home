@@ -39,7 +39,7 @@ type Mode = "list" | "create" | "edit";
 
 export default function VirtualRoomsPage() {
   const router = useRouter();
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   const { rooms, virtualRooms, areas, isLoading } = useDeviceStore();
   
   const [mode, setMode] = useState<Mode>("list");
@@ -51,10 +51,10 @@ export default function VirtualRoomsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
   // Populate form when editing
   useEffect(() => {

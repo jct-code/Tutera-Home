@@ -33,7 +33,7 @@ type ViewMode = "zones" | "rooms";
 
 export default function LightingPage() {
   const router = useRouter();
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   // Use useShallow to prevent re-renders when object references change but values are the same
   const { lights, isLoading } = useDeviceStore(useShallow((state) => ({
     lights: state.lights,
@@ -55,12 +55,12 @@ export default function LightingPage() {
   const { actualLights } = useMemo(() => separateLightsAndEquipment(lights), [lights]);
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
-  if (!isConnected) return null;
+  if (!isConnected && !isRefreshingAuth) return null;
 
   // Calculate statistics
   const totalLights = actualLights.length;

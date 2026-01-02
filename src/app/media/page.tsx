@@ -37,7 +37,7 @@ type ViewMode = "zones" | "rooms";
 
 export default function MediaPage() {
   const router = useRouter();
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   // Use useShallow to prevent re-renders when object references change but values are the same
   const { mediaRooms, rooms, isLoading } = useDeviceStore(useShallow((state) => ({
     mediaRooms: state.mediaRooms,
@@ -61,12 +61,12 @@ export default function MediaPage() {
   }, [rooms]);
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
-  if (!isConnected) return null;
+  if (!isConnected && !isRefreshingAuth) return null;
 
   // Calculate stats
   const totalRooms = mediaRooms.length;

@@ -56,7 +56,7 @@ const itemVariants = {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   // Use useShallow to prevent re-renders when object references change but values are the same
   const { 
     areas,
@@ -95,12 +95,12 @@ export default function Dashboard() {
     fetchWeather();
   }, []);
 
-  // Redirect to login if not connected
+  // Redirect to login if not connected (but not while refreshing auth)
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
   // Separate actual lights from equipment controls (Fan, Fountain, Heater, etc.)
   const { actualLights: filteredLights, equipment: filteredEquipment } = useMemo(

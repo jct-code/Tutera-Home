@@ -6,6 +6,7 @@ import { persist } from "zustand/middleware";
 interface AuthState {
   isConnected: boolean;
   isConnecting: boolean;
+  isRefreshingAuth: boolean; // Flag to prevent redirects during auth refresh
   processorIp: string | null;
   authKey: string | null;
   authToken: string | null; // Store the original auth token for re-login
@@ -15,6 +16,7 @@ interface AuthState {
   // Actions
   setConnection: (processorIp: string, authKey: string, authToken?: string, fromEnv?: boolean) => void;
   setConnecting: (isConnecting: boolean) => void;
+  setRefreshingAuth: (isRefreshing: boolean) => void;
   setError: (error: string | null) => void;
   disconnect: () => void;
   invalidateAuth: () => void; // Mark auth as invalid without full disconnect
@@ -28,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       isConnected: false,
       isConnecting: false,
+      isRefreshingAuth: false,
       processorIp: null,
       authKey: null,
       authToken: null,
@@ -38,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           isConnected: true,
           isConnecting: false,
+          isRefreshingAuth: false,
           processorIp,
           authKey,
           authToken: authToken || get().authToken, // Preserve existing token if not provided
@@ -46,6 +50,8 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       setConnecting: (isConnecting) => set({ isConnecting }),
+      
+      setRefreshingAuth: (isRefreshing) => set({ isRefreshingAuth: isRefreshing }),
 
       setError: (error) =>
         set({
@@ -57,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           isConnected: false,
           isConnecting: false,
+          isRefreshingAuth: false,
           processorIp: null,
           authKey: null,
           authToken: null,
@@ -67,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
       invalidateAuth: () =>
         set({
           isConnected: false,
+          isRefreshingAuth: false,
           authKey: null,
           // Keep processorIp, authToken, and authTokenFromEnv for re-login
         }),
@@ -127,7 +135,7 @@ export async function login(processorIp: string, authToken: string): Promise<boo
 
 // Refresh authentication - attempt to re-login with stored credentials
 export async function refreshAuth(): Promise<boolean> {
-  const { processorIp, authToken, authTokenFromEnv, setConnecting, setConnection, setError, invalidateAuth } = useAuthStore.getState();
+  const { processorIp, authToken, authTokenFromEnv, setConnecting, setConnection, setError, invalidateAuth, setRefreshingAuth } = useAuthStore.getState();
   
   // Need processorIp and either authToken or env flag to refresh
   if (!processorIp || (!authToken && !authTokenFromEnv)) {
@@ -135,6 +143,8 @@ export async function refreshAuth(): Promise<boolean> {
     return false;
   }
   
+  // Set refreshing flag to prevent redirects during refresh
+  setRefreshingAuth(true);
   setConnecting(true);
   
   try {

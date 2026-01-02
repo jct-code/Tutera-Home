@@ -35,7 +35,7 @@ type ViewMode = "zones" | "rooms";
 
 export default function ClimatePage() {
   const router = useRouter();
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   // Use useShallow to prevent re-renders when object references change but values are the same
   const { thermostats, sensors, isLoading } = useDeviceStore(useShallow((state) => ({
     thermostats: state.thermostats,
@@ -60,17 +60,17 @@ export default function ClimatePage() {
   );
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
   // Fetch weather on mount
   useEffect(() => {
     fetchWeather();
   }, []);
 
-  if (!isConnected) return null;
+  if (!isConnected && !isRefreshingAuth) return null;
 
   // Calculate averages from sensors
   const tempSensors = sensors.filter(s => s.subType === "temperature");

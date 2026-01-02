@@ -63,7 +63,7 @@ export default function RoomPage() {
   const params = useParams();
   const roomId = params.id as string;
   
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   const { rooms, virtualRooms, lights, shades, thermostats, sensors, mediaRooms, isLoading } = useDeviceStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -203,10 +203,10 @@ export default function RoomPage() {
   }, [isVirtualRoom, virtualRoom, roomLights, roomEquipment, roomShades, roomThermostats, roomSensors, roomMediaRooms, roomNameMap]);
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -214,7 +214,7 @@ export default function RoomPage() {
     setIsRefreshing(false);
   };
 
-  if (!isConnected) return null;
+  if (!isConnected && !isRefreshingAuth) return null;
 
   const totalDevices = roomLights.length + roomEquipment.length + roomShades.length + roomThermostats.length + roomSensors.length + roomMediaRooms.length;
 

@@ -38,7 +38,7 @@ const itemVariants = {
 
 export default function SecurityPage() {
   const router = useRouter();
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   // Use useShallow to prevent re-renders when object references change but values are the same
   const { doorLocks, sensors, securityDevices, isLoading } = useDeviceStore(useShallow((state) => ({
     doorLocks: state.doorLocks,
@@ -53,12 +53,12 @@ export default function SecurityPage() {
   );
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
-  if (!isConnected) return null;
+  if (!isConnected && !isRefreshingAuth) return null;
 
   // Calculate stats
   const unlockedCount = doorLocks.filter(l => !l.isLocked).length;

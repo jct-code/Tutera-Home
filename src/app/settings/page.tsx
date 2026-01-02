@@ -28,7 +28,7 @@ const itemVariants = {
 export default function SettingsPage() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   const { 
     zoneControlStyle, 
     setZoneControlStyle,
@@ -57,10 +57,10 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (isMounted && !isConnected) {
+    if (isMounted && !isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router, isMounted]);
+  }, [isConnected, isRefreshingAuth, router, isMounted]);
 
   // Wait for hydration to complete
   if (!isMounted) {
@@ -71,7 +71,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (!isConnected) return null;
+  if (!isConnected && !isRefreshingAuth) return null;
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-20 md:pb-6">

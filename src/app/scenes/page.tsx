@@ -62,7 +62,7 @@ interface RoomSceneGroup {
 
 export default function ScenesPage() {
   const router = useRouter();
-  const { isConnected } = useAuthStore();
+  const { isConnected, isRefreshingAuth } = useAuthStore();
   // Use useShallow to prevent re-renders when object references change but values are the same
   const { scenes, isLoading } = useDeviceStore(useShallow((state) => ({
     scenes: state.scenes,
@@ -71,10 +71,10 @@ export default function ScenesPage() {
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !isRefreshingAuth) {
       router.push("/login");
     }
-  }, [isConnected, router]);
+  }, [isConnected, isRefreshingAuth, router]);
 
   // Group scenes by room
   const scenesByRoom = useMemo(() => {
