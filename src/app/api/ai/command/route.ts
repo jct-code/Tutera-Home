@@ -191,7 +191,20 @@ async function executeLightControl(
   message: string;
   snapshots: DeviceStateSnapshot[];
 }> {
+  // LOG: Track room matching for debugging
+  console.log("[AI Light Control] Args:", JSON.stringify(args));
+  console.log("[AI Light Control] Available rooms:", context.rooms.map(r => ({ id: r.id, name: r.name })));
+  console.log("[AI Light Control] Total lights:", context.lights.length);
+  if (args.room) {
+    const roomsMatchingName = context.rooms.filter(r => 
+      r.name.toLowerCase().includes(args.room!.toLowerCase()) || 
+      args.room!.toLowerCase().includes(r.name.toLowerCase())
+    );
+    console.log("[AI Light Control] Rooms matching '" + args.room + "':", roomsMatchingName.map(r => r.name));
+  }
+  
   const matchingLights = getMatchingLights(args, context);
+  console.log("[AI Light Control] Matched lights:", matchingLights.map(l => ({ id: l.id, name: l.name, roomId: l.roomId, level: l.level })));
   
   if (matchingLights.length === 0) {
     return {
@@ -647,6 +660,11 @@ ${thermostatsList}
         
         const functionName = toolCall.function.name;
         const args = JSON.parse(toolCall.function.arguments);
+        
+        // LOG: Track AI function calls for debugging
+        console.log("[AI Request] User message:", message);
+        console.log("[AI Request] Function called:", functionName);
+        console.log("[AI Request] Arguments:", JSON.stringify(args));
 
         let result: { success: boolean; message: string; snapshots: DeviceStateSnapshot[] } = {
           success: false,
