@@ -390,10 +390,17 @@ export function generateStatusReport(
   const parts: string[] = [];
   const { areas, rooms, lights } = context;
   
+  // LOG: Debug light status data
+  console.log("[AI Status Report] Args:", JSON.stringify(args));
+  console.log("[AI Status Report] Total lights in context:", lights.length);
+  
   // If asking about whole house lights without specific area/room, break down by area
   if ((args.device_type === "lights" || args.device_type === "all") && !args.area && !args.room) {
     const allLights = lights;
     const allLightsOn = allLights.filter(l => l.isOn || l.level > 0);
+    
+    // LOG: Show which lights are considered "on" and their levels
+    console.log("[AI Status Report] Lights on:", allLightsOn.map(l => ({ name: l.name, level: l.level, isOn: l.isOn })));
     
     if (allLightsOn.length === 0) {
       parts.push(`All ${allLights.length} lights in the house are off.`);
@@ -431,6 +438,11 @@ export function generateStatusReport(
     const targetDesc = args.room || args.area || "the whole house";
     const matchedLights = getMatchingLights(args, context);
     const lightsOn = matchedLights.filter(l => l.isOn || l.level > 0);
+    
+    // LOG: Debug room-specific light matching
+    console.log("[AI Status Report] Target:", targetDesc);
+    console.log("[AI Status Report] Matched lights:", matchedLights.map(l => ({ name: l.name, roomId: l.roomId, level: l.level, isOn: l.isOn })));
+    console.log("[AI Status Report] Lights on:", lightsOn.map(l => ({ name: l.name, level: l.level })));
     
     if (lightsOn.length === 0) {
       parts.push(`All ${matchedLights.length} lights in ${targetDesc} are off.`);
