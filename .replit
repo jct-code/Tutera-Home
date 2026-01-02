@@ -62,3 +62,8 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[userenv]
+
+[userenv.shared]
+CRESTRON_PROCESSOR_IP = "crestron-home.creston-tutera-home.com"
