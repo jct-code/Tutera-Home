@@ -17,18 +17,22 @@ export default function LoginPage() {
   const [localError, setLocalError] = useState("");
   const [isAutoConnecting, setIsAutoConnecting] = useState(true);
 
-  // Check for auto-connect on mount - always verify connection even if marked as connected
+  // Check for auto-connect on mount
   useEffect(() => {
     const checkAutoConnect = async () => {
+      // If already connected (from persisted state), just redirect
+      if (isConnected) {
+        router.push("/");
+        return;
+      }
+
       try {
-        // Always try to get a fresh auth key from the config endpoint
-        // This handles cases where the server restarted and the old auth key is stale
+        // Try to get a fresh auth key from the config endpoint
         const response = await fetch("/api/crestron/config");
         const data = await response.json();
 
         if (data.autoConnectAvailable && data.processorIp && data.authKey) {
           // Auto-connect successful, set connection and redirect
-          // Pass undefined for authToken and true for fromEnv since we're using env credentials
           setConnection(data.processorIp, data.authKey, undefined, data.authTokenFromEnv || false);
           router.push("/");
           return;
@@ -46,7 +50,7 @@ export default function LoginPage() {
     };
 
     checkAutoConnect();
-  }, [router, setConnection]);
+  }, [router, setConnection, isConnected]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
