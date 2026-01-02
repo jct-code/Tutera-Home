@@ -68,7 +68,7 @@ export function useSwipeControl(options: {
   const [startX, setStartX] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingPointerRef = useRef<{ clientX: number; pointerId: number; target: HTMLElement } | null>(null);
+  const pendingPointerRef = useRef<{ clientX: number; clientY: number; pointerId: number; target: HTMLElement } | null>(null);
 
   // Calculate percentage from absolute position within the card
   const calculatePercentFromPosition = useCallback((clientX: number): number => {
@@ -101,6 +101,7 @@ export function useSwipeControl(options: {
     // Store pending pointer info and start hold timer
     pendingPointerRef.current = { 
       clientX: e.clientX, 
+      clientY: e.clientY,
       pointerId: e.pointerId, 
       target: e.target as HTMLElement 
     };
@@ -118,7 +119,11 @@ export function useSwipeControl(options: {
         } else {
           setDragPercent(currentPercent);
         }
-        pendingPointerRef.current.target.setPointerCapture(pendingPointerRef.current.pointerId);
+        try {
+          pendingPointerRef.current.target.setPointerCapture(pendingPointerRef.current.pointerId);
+        } catch {
+          // Ignore if pointer is no longer active
+        }
       }
     }, HOLD_DELAY_MS);
   }, [isUpdating, currentPercent, isDimmer, calculatePercentFromPosition]);
@@ -127,8 +132,8 @@ export function useSwipeControl(options: {
     // If still in hold phase (before delay), check if user is scrolling
     if (isHolding && !isDragging) {
       const deltaX = Math.abs(e.clientX - startX);
-      const deltaY = Math.abs(e.clientY - (pendingPointerRef.current?.clientX || 0));
-      // If moved more than 10px, cancel the hold (user is scrolling)
+      const deltaY = Math.abs(e.clientY - (pendingPointerRef.current?.clientY || e.clientY));
+      // If moved more than 10px in any direction, cancel the hold (user is scrolling)
       if (deltaX > 10 || deltaY > 10) {
         if (holdTimerRef.current) {
           clearTimeout(holdTimerRef.current);
@@ -341,7 +346,7 @@ export function LightCard({ light, compact = false, roomName }: LightCardProps) 
           transition-shadow duration-300
           border border-[var(--border-light)] shadow-[var(--shadow)]
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
-          ${isDimmer ? "cursor-ew-resize select-none touch-none" : ""}
+          ${isDimmer ? "cursor-ew-resize select-none touch-pan-y" : ""}
           ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}
           ${isUpdating ? "opacity-70" : ""}
         `}
@@ -461,7 +466,7 @@ export function LightCard({ light, compact = false, roomName }: LightCardProps) 
         transition-shadow duration-300
         border border-[var(--border-light)] shadow-[var(--shadow)]
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
-        ${isDimmer ? "cursor-ew-resize select-none touch-none" : ""}
+        ${isDimmer ? "cursor-ew-resize select-none touch-pan-y" : ""}
         ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}
         ${isUpdating ? "opacity-70 pointer-events-none" : ""}
       `}
@@ -572,7 +577,7 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
   const [startX, setStartX] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingPointerRef = useRef<{ clientX: number; pointerId: number; target: HTMLElement } | null>(null);
+  const pendingPointerRef = useRef<{ clientX: number; clientY: number; pointerId: number; target: HTMLElement } | null>(null);
   
   const onCount = lights.filter(l => l.isOn || l.level > 0).length;
   const totalLights = lights.length;
@@ -612,6 +617,7 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
     // Store pending pointer info and start hold timer
     pendingPointerRef.current = { 
       clientX: e.clientX, 
+      clientY: e.clientY,
       pointerId: e.pointerId, 
       target: e.target as HTMLElement 
     };
@@ -623,7 +629,11 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
       if (pendingPointerRef.current) {
         setIsDragging(true);
         setDragPercent(avgPercent);
-        pendingPointerRef.current.target.setPointerCapture(pendingPointerRef.current.pointerId);
+        try {
+          pendingPointerRef.current.target.setPointerCapture(pendingPointerRef.current.pointerId);
+        } catch {
+          // Ignore if pointer is no longer active
+        }
       }
     }, HOLD_DELAY_MS);
   }, [isUpdating, avgPercent, standalone]);
@@ -632,8 +642,9 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
     // If still in hold phase (before delay), check if user is scrolling
     if (isHolding && !isDragging) {
       const deltaX = Math.abs(e.clientX - startX);
-      // If moved more than 10px, cancel the hold (user is scrolling)
-      if (deltaX > 10) {
+      const deltaY = Math.abs(e.clientY - (pendingPointerRef.current?.clientY || e.clientY));
+      // If moved more than 10px in any direction, cancel the hold (user is scrolling)
+      if (deltaX > 10 || deltaY > 10) {
         if (holdTimerRef.current) {
           clearTimeout(holdTimerRef.current);
           holdTimerRef.current = null;
@@ -736,7 +747,7 @@ export function LightGroupControl({ lights, roomName, standalone = true }: Light
       tabIndex={0}
       className={`
         relative overflow-hidden rounded-[var(--radius)] cursor-ew-resize
-        transition-shadow duration-300 select-none touch-none
+        transition-shadow duration-300 select-none touch-pan-y
         border border-[var(--border-light)] shadow-[var(--shadow)]
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
         ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}
