@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { LightCard, LightGroupControl, levelToPercent, percentToLevel } from "@/components/devices/LightCard";
 import { EquipmentCard } from "@/components/devices/EquipmentCard";
@@ -71,6 +71,9 @@ function CompactSceneButton({ scene }: { scene: Scene }) {
   );
 }
 
+const HOLD_DELAY_MS = 200;
+const SCROLL_THRESHOLD = 10;
+
 interface LightingRoomGroupComponentProps {
   group: LightingRoomGroup;
   expanded?: boolean;
@@ -98,9 +101,21 @@ export function LightingRoomGroup({
   const isOn = lightsOn > 0;
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
   const [dragPercent, setDragPercent] = useState<number | null>(null);
   const [startX, setStartX] = useState(0);
   const headerRef = useRef<HTMLDivElement>(null);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingPointerRef = useRef<{ clientX: number; clientY: number; pointerId: number } | null>(null);
+  
+  // Clear hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
   
   const buttonDisabled = isUpdating || lights.length === 0;
 
@@ -161,20 +176,54 @@ export function LightingRoomGroup({
     }
   }, [isOn, lights, isUpdating]);
 
-  // Handle swipe for brightness control
+  // Handle swipe for brightness control with hold delay
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (isUpdating) return;
     // Don't start dragging if clicking on expand chevron area or toggle button
     const target = e.target as HTMLElement;
     if (target.closest('[data-expand-button]') || target.closest('[data-toggle-button]')) return;
     
-    setIsDragging(true);
+    // Store pending pointer info and start hold timer
+    pendingPointerRef.current = { 
+      clientX: e.clientX, 
+      clientY: e.clientY,
+      pointerId: e.pointerId
+    };
+    setIsHolding(true);
     setStartX(e.clientX);
-    setDragPercent(avgPercent);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
+    // Start hold timer - only activate dragging after delay
+    holdTimerRef.current = setTimeout(() => {
+      if (pendingPointerRef.current) {
+        setIsDragging(true);
+        setDragPercent(avgPercent);
+        try {
+          (e.target as HTMLElement).setPointerCapture(pendingPointerRef.current.pointerId);
+        } catch {
+          // Pointer capture may fail if pointer was released
+        }
+      }
+    }, HOLD_DELAY_MS);
   }, [isUpdating, avgPercent]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    // Check if user is scrolling during hold period (before drag activated)
+    if (isHolding && !isDragging && pendingPointerRef.current) {
+      const deltaX = Math.abs(e.clientX - pendingPointerRef.current.clientX);
+      const deltaY = Math.abs(e.clientY - pendingPointerRef.current.clientY);
+      
+      // If user moved too much, cancel the hold (they're scrolling)
+      if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        pendingPointerRef.current = null;
+        setIsHolding(false);
+        return;
+      }
+    }
+    
     if (!isDragging || isUpdating) return;
     
     const headerWidth = headerRef.current?.offsetWidth || 300;
@@ -182,11 +231,24 @@ export function LightingRoomGroup({
     const percentChange = (deltaX / headerWidth) * 100;
     const newPercent = Math.max(0, Math.min(100, avgPercent + percentChange));
     setDragPercent(Math.round(newPercent));
-  }, [isDragging, isUpdating, startX, avgPercent]);
+  }, [isDragging, isHolding, isUpdating, startX, avgPercent]);
 
   const handlePointerUp = useCallback(async (e: React.PointerEvent) => {
+    // Clear hold timer if still pending
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    pendingPointerRef.current = null;
+    setIsHolding(false);
+    
     if (!isDragging) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // May fail if not captured
+    }
     
     const headerWidth = headerRef.current?.offsetWidth || 300;
     const deltaX = e.clientX - startX;
@@ -216,24 +278,70 @@ export function LightingRoomGroup({
     e.stopPropagation();
   }, []);
 
-  // Slider control handlers
+  // Slider control handlers with hold delay
   const [sliderDragging, setSliderDragging] = useState(false);
+  const [sliderHolding, setSliderHolding] = useState(false);
   const [sliderDragPercent, setSliderDragPercent] = useState<number | null>(null);
   const [sliderStartX, setSliderStartX] = useState(0);
   const sliderRef = useRef<HTMLDivElement>(null);
+  const sliderHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sliderPendingPointerRef = useRef<{ clientX: number; clientY: number; pointerId: number } | null>(null);
+  
+  // Clear slider hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (sliderHoldTimerRef.current) {
+        clearTimeout(sliderHoldTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSliderPointerDown = useCallback((e: React.PointerEvent) => {
     if (isUpdating) return;
     const target = e.target as HTMLElement;
     if (target.closest('[data-expand-button]') || target.closest('[data-toggle-button]')) return;
     
-    setSliderDragging(true);
+    // Store pending pointer info and start hold timer
+    sliderPendingPointerRef.current = { 
+      clientX: e.clientX, 
+      clientY: e.clientY,
+      pointerId: e.pointerId
+    };
+    setSliderHolding(true);
     setSliderStartX(e.clientX);
-    setSliderDragPercent(avgPercent);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
+    // Start hold timer - only activate dragging after delay
+    sliderHoldTimerRef.current = setTimeout(() => {
+      if (sliderPendingPointerRef.current) {
+        setSliderDragging(true);
+        setSliderDragPercent(avgPercent);
+        try {
+          (e.target as HTMLElement).setPointerCapture(sliderPendingPointerRef.current.pointerId);
+        } catch {
+          // Pointer capture may fail if pointer was released
+        }
+      }
+    }, HOLD_DELAY_MS);
   }, [isUpdating, avgPercent]);
 
   const handleSliderPointerMove = useCallback((e: React.PointerEvent) => {
+    // Check if user is scrolling during hold period (before drag activated)
+    if (sliderHolding && !sliderDragging && sliderPendingPointerRef.current) {
+      const deltaX = Math.abs(e.clientX - sliderPendingPointerRef.current.clientX);
+      const deltaY = Math.abs(e.clientY - sliderPendingPointerRef.current.clientY);
+      
+      // If user moved too much, cancel the hold (they're scrolling)
+      if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
+        if (sliderHoldTimerRef.current) {
+          clearTimeout(sliderHoldTimerRef.current);
+          sliderHoldTimerRef.current = null;
+        }
+        sliderPendingPointerRef.current = null;
+        setSliderHolding(false);
+        return;
+      }
+    }
+    
     if (!sliderDragging || isUpdating) return;
     
     const sliderWidth = sliderRef.current?.offsetWidth || 300;
@@ -241,11 +349,24 @@ export function LightingRoomGroup({
     const percentChange = (deltaX / sliderWidth) * 100;
     const newPercent = Math.max(0, Math.min(100, avgPercent + percentChange));
     setSliderDragPercent(Math.round(newPercent));
-  }, [sliderDragging, isUpdating, sliderStartX, avgPercent]);
+  }, [sliderDragging, sliderHolding, isUpdating, sliderStartX, avgPercent]);
 
   const handleSliderPointerUp = useCallback(async (e: React.PointerEvent) => {
+    // Clear hold timer if still pending
+    if (sliderHoldTimerRef.current) {
+      clearTimeout(sliderHoldTimerRef.current);
+      sliderHoldTimerRef.current = null;
+    }
+    sliderPendingPointerRef.current = null;
+    setSliderHolding(false);
+    
     if (!sliderDragging) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // May fail if not captured
+    }
     
     const sliderWidth = sliderRef.current?.offsetWidth || 300;
     const deltaX = e.clientX - sliderStartX;
@@ -347,7 +468,7 @@ export function LightingRoomGroup({
               tabIndex={0}
               className={`
                 flex-1 relative overflow-hidden rounded-lg cursor-ew-resize h-6
-                transition-shadow duration-300 select-none touch-none
+                transition-shadow duration-300 select-none touch-pan-y
                 bg-[var(--border-light)]
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
                 ${sliderDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}

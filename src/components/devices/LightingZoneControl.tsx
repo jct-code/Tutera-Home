@@ -418,7 +418,7 @@ export function LightingZoneControl({
               tabIndex={0}
               className={`
                 relative overflow-hidden rounded-[var(--radius)] cursor-ew-resize
-                transition-all duration-300 select-none touch-none
+                transition-all duration-300 select-none touch-pan-y
                 border-2 bg-[var(--surface)]
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
                 ${isSliderActivated 
@@ -495,7 +495,7 @@ export function LightingZoneControl({
               tabIndex={0}
               className={`
                 relative overflow-hidden rounded-[var(--radius)] cursor-ew-resize
-                transition-shadow duration-300 select-none touch-none
+                transition-shadow duration-300 select-none touch-pan-y
                 border border-[var(--border-light)] bg-[var(--surface)]
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2
                 ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}

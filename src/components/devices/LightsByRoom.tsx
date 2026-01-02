@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronRight, Lightbulb, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -30,12 +30,27 @@ interface SwipeableRoomHeaderProps {
   isWarning?: boolean;
 }
 
+const HOLD_DELAY_MS = 200;
+const SCROLL_THRESHOLD = 10;
+
 function SwipeableRoomHeader({ group, isExpanded, onToggleExpand, isWarning = false }: SwipeableRoomHeaderProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
   const [dragPercent, setDragPercent] = useState<number | null>(null);
   const [startX, setStartX] = useState(0);
   const headerRef = useRef<HTMLDivElement>(null);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingPointerRef = useRef<{ clientX: number; clientY: number; pointerId: number } | null>(null);
+  
+  // Clear hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
   
   const onCount = group.lights.filter(l => l.isOn || l.level > 0).length;
   const totalLights = group.lights.length;
@@ -66,13 +81,47 @@ function SwipeableRoomHeader({ group, isExpanded, onToggleExpand, isWarning = fa
     const target = e.target as HTMLElement;
     if (target.closest('[data-expand-button]')) return;
     
-    setIsDragging(true);
+    // Store pending pointer info and start hold timer
+    pendingPointerRef.current = { 
+      clientX: e.clientX, 
+      clientY: e.clientY,
+      pointerId: e.pointerId
+    };
+    setIsHolding(true);
     setStartX(e.clientX);
-    setDragPercent(avgPercent);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
+    // Start hold timer - only activate dragging after delay
+    holdTimerRef.current = setTimeout(() => {
+      if (pendingPointerRef.current) {
+        setIsDragging(true);
+        setDragPercent(avgPercent);
+        try {
+          (e.target as HTMLElement).setPointerCapture(pendingPointerRef.current.pointerId);
+        } catch {
+          // Pointer capture may fail if pointer was released
+        }
+      }
+    }, HOLD_DELAY_MS);
   }, [isUpdating, avgPercent]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    // Check if user is scrolling during hold period (before drag activated)
+    if (isHolding && !isDragging && pendingPointerRef.current) {
+      const deltaX = Math.abs(e.clientX - pendingPointerRef.current.clientX);
+      const deltaY = Math.abs(e.clientY - pendingPointerRef.current.clientY);
+      
+      // If user moved too much, cancel the hold (they're scrolling)
+      if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        pendingPointerRef.current = null;
+        setIsHolding(false);
+        return;
+      }
+    }
+    
     if (!isDragging || isUpdating) return;
     
     const headerWidth = headerRef.current?.offsetWidth || 300;
@@ -80,11 +129,24 @@ function SwipeableRoomHeader({ group, isExpanded, onToggleExpand, isWarning = fa
     const percentChange = (deltaX / headerWidth) * 100;
     const newPercent = Math.max(0, Math.min(100, avgPercent + percentChange));
     setDragPercent(Math.round(newPercent));
-  }, [isDragging, isUpdating, startX, avgPercent]);
+  }, [isDragging, isHolding, isUpdating, startX, avgPercent]);
 
   const handlePointerUp = useCallback(async (e: React.PointerEvent) => {
+    // Clear hold timer if still pending
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    pendingPointerRef.current = null;
+    setIsHolding(false);
+    
     if (!isDragging) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // May fail if not captured
+    }
     
     const headerWidth = headerRef.current?.offsetWidth || 300;
     const deltaX = e.clientX - startX;
@@ -109,7 +171,7 @@ function SwipeableRoomHeader({ group, isExpanded, onToggleExpand, isWarning = fa
       onPointerCancel={handlePointerUp}
       className={`
         relative overflow-hidden w-full flex items-center justify-between p-3 rounded-xl
-        cursor-ew-resize select-none touch-none
+        cursor-ew-resize select-none touch-pan-y
         transition-shadow duration-200
         ${isDragging ? "shadow-[var(--shadow-lg)] z-10" : ""}
         ${isUpdating ? "opacity-70 pointer-events-none" : ""}
