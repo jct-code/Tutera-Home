@@ -3,7 +3,7 @@ import { CrestronClient } from "@/lib/crestron/client";
 
 // GET - Check if auto-connect is available and attempt connection
 export async function GET() {
-  const processorIp = process.env.PROCESSOR_IP;
+  const processorIp = process.env.CRESTRON_PROCESSOR_IP || process.env.PROCESSOR_IP;
   const authToken = process.env.CRESTRON_HOME_KEY;
 
   // Both must be present for auto-connect
