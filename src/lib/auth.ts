@@ -1,7 +1,7 @@
 import * as client from "openid-client";
 import { cookies } from "next/headers";
 import { db } from "./db";
-import { users, sessions } from "./schema";
+import { users, sessions, allowedUsers } from "./schema";
 import { eq } from "drizzle-orm";
 import type { User, UpsertUser } from "./schema";
 import crypto from "crypto";
@@ -100,6 +100,22 @@ export async function getCurrentUser(): Promise<User | null> {
   return user || null;
 }
 
+export async function getCurrentUserFromRequest(request: { cookies: { get: (name: string) => { value: string } | undefined } }): Promise<User | null> {
+  const sessionId = request.cookies.get(SESSION_COOKIE)?.value;
+  
+  if (!sessionId) {
+    return null;
+  }
+  
+  const session = await getSession(sessionId);
+  if (!session) {
+    return null;
+  }
+  
+  const user = await getUser(session.userId);
+  return user || null;
+}
+
 export function generateState(): string {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -129,19 +145,21 @@ export async function getLoginUrl(hostname: string, state: string, codeVerifier:
   return authUrl.href;
 }
 
-function isEmailAllowed(email: string | undefined): boolean {
-  const allowedUsers = process.env.ALLOWED_USERS;
-  
-  if (!allowedUsers) {
-    return true;
-  }
-  
+const ADMIN_EMAIL = "joetutera@gmail.com";
+
+async function isEmailAllowed(email: string | undefined): Promise<boolean> {
   if (!email) {
     return false;
   }
   
-  const allowedList = allowedUsers.split(",").map(e => e.trim().toLowerCase());
-  return allowedList.includes(email.toLowerCase());
+  const normalizedEmail = email.toLowerCase();
+  
+  if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
+    return true;
+  }
+  
+  const [allowed] = await db.select().from(allowedUsers).where(eq(allowedUsers.email, normalizedEmail));
+  return !!allowed;
 }
 
 export async function handleCallback(callbackUrlWithParams: URL, expectedState: string, codeVerifier: string): Promise<string> {
@@ -169,7 +187,7 @@ export async function handleCallback(callbackUrlWithParams: URL, expectedState: 
   }
   
   const userEmail = claims.email as string | undefined;
-  if (!isEmailAllowed(userEmail)) {
+  if (!(await isEmailAllowed(userEmail))) {
     throw new Error("ACCESS_DENIED: Your email is not authorized to access this application");
   }
   

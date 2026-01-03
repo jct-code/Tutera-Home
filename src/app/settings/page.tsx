@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Settings, Sliders, Grid3X3, RotateCcw, Zap, Move, Home, ChevronRight, Tv } from "lucide-react";
+import { Settings, Sliders, Grid3X3, RotateCcw, Zap, Move, Home, ChevronRight, Tv, Users } from "lucide-react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { BottomNavigation } from "@/components/layout/Navigation";
@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/Card";
 import { useAuthStore } from "@/stores/authStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { usePollingStore, formatDuration } from "@/stores/pollingStore";
+import { UserManagement } from "@/components/settings/UserManagement";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -356,6 +357,14 @@ export default function SettingsPage() {
                 <ChevronRight className="w-5 h-5 text-[var(--text-tertiary)]" />
               </Link>
             </Card>
+          </motion.section>
+
+          {/* User Management */}
+          <motion.section variants={itemVariants}>
+            <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+              User Access
+            </h2>
+            <UserManagement />
           </motion.section>
 
           {/* API Refresh Settings */}

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, timestamp, varchar, serial, boolean } from "drizzle-orm/pg-core";
 
 export const sessions = pgTable(
   "sessions",
@@ -23,3 +23,13 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export const allowedUsers = pgTable("allowed_users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email").notNull().unique(),
+  addedBy: varchar("added_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AllowedUser = typeof allowedUsers.$inferSelect;
+export type InsertAllowedUser = typeof allowedUsers.$inferInsert;
