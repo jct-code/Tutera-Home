@@ -68,3 +68,4 @@ outputType = "webview"
 
 [userenv.shared]
 CRESTRON_PROCESSOR_IP = "crestron-home.creston-tutera-home.com"
+ALLOWED_USERS = "joetutera@gmail.com"

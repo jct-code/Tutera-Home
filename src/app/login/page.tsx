@@ -1,16 +1,33 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, Wifi, Key, AlertCircle, Loader2, LogIn } from "lucide-react";
+import { Home, Wifi, Key, AlertCircle, Loader2, LogIn, ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useAuthStore, login } from "@/stores/authStore";
 import { useAuth } from "@/hooks/useAuth";
 
+function getAuthErrorMessage(error: string | null): string | null {
+  if (!error) return null;
+  switch (error) {
+    case "access_denied":
+      return "Your email is not authorized to access this application. Please contact the administrator.";
+    case "callback_failed":
+      return "Authentication failed. Please try again.";
+    case "invalid_state":
+      return "Session expired. Please try again.";
+    case "no_code":
+      return "Authentication was cancelled. Please try again.";
+    default:
+      return "An error occurred during sign in. Please try again.";
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isConnecting, error, isConnected, setConnection } = useAuthStore();
   const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
   
@@ -18,6 +35,9 @@ export default function LoginPage() {
   const [authToken, setAuthToken] = useState("");
   const [localError, setLocalError] = useState("");
   const [isAutoConnecting, setIsAutoConnecting] = useState(true);
+  
+  const authError = searchParams.get("error");
+  const authErrorMessage = getAuthErrorMessage(authError);
 
   // If user is authenticated and connected to Crestron, redirect to dashboard
   useEffect(() => {
@@ -141,6 +161,22 @@ export default function LoginPage() {
                   Sign in to control your home
                 </p>
               </div>
+
+              {authErrorMessage && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="p-4 bg-red-50 border border-red-200 rounded-xl text-left"
+                >
+                  <div className="flex items-start gap-3">
+                    <ShieldX className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-red-800">Access Denied</p>
+                      <p className="text-sm text-red-600 mt-1">{authErrorMessage}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               <a
                 href="/api/login"

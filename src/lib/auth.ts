@@ -118,6 +118,21 @@ export async function getLoginUrl(hostname: string, state: string): Promise<stri
   return authUrl.href;
 }
 
+function isEmailAllowed(email: string | undefined): boolean {
+  const allowedUsers = process.env.ALLOWED_USERS;
+  
+  if (!allowedUsers) {
+    return true;
+  }
+  
+  if (!email) {
+    return false;
+  }
+  
+  const allowedList = allowedUsers.split(",").map(e => e.trim().toLowerCase());
+  return allowedList.includes(email.toLowerCase());
+}
+
 export async function handleCallback(code: string, hostname: string, state: string, expectedState: string): Promise<string> {
   if (!state || state !== expectedState) {
     throw new Error("Invalid OAuth state - possible CSRF attack");
@@ -136,9 +151,14 @@ export async function handleCallback(code: string, hostname: string, state: stri
     throw new Error("No claims received from OIDC provider");
   }
   
+  const userEmail = claims.email as string | undefined;
+  if (!isEmailAllowed(userEmail)) {
+    throw new Error("ACCESS_DENIED: Your email is not authorized to access this application");
+  }
+  
   await upsertUser({
     id: claims.sub,
-    email: claims.email as string | undefined,
+    email: userEmail,
     firstName: (claims as any).first_name as string | undefined,
     lastName: (claims as any).last_name as string | undefined,
     profileImageUrl: (claims as any).profile_image_url as string | undefined,

@@ -60,12 +60,21 @@ The app uses Replit Auth for secure multi-user authentication:
 - Sign in with Apple, Google, or email
 - Sessions stored in PostgreSQL database
 - Family members can access from iPhone (Apple ID), desktop, and Android
+- **Access restricted to approved email addresses only**
+
+### Allowed Users
+To control who can access the app, set the `ALLOWED_USERS` environment variable:
+- Comma-separated list of email addresses
+- Example: `joetutera@gmail.com,family@example.com,guest@example.com`
+- If not set, all authenticated users are allowed
+- Currently configured: joetutera@gmail.com
 
 ### Authentication Flow
 1. User visits the app and sees the "Tutera Home" welcome screen
 2. Clicks "Sign In" to authenticate via Replit Auth (Apple/Google/email)
-3. After authentication, connects to the Crestron processor
-4. Dashboard is accessible only to authenticated users
+3. System checks if user's email is in the allowed list
+4. If approved, user can connect to the Crestron processor
+5. If denied, user sees an "Access Denied" message
 
 ### Auth Files
 - `src/lib/auth.ts` - OIDC client and session management

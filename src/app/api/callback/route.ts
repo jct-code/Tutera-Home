@@ -44,6 +44,12 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Callback error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
+    if (errorMessage.includes("ACCESS_DENIED")) {
+      return NextResponse.redirect(new URL("/login?error=access_denied", request.url));
+    }
+    
     return NextResponse.redirect(new URL("/login?error=callback_failed", request.url));
   }
 }
