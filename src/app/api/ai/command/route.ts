@@ -186,6 +186,18 @@ async function fetchDeviceState(client: CrestronClient) {
     lightsRes.success ? lightsRes.data : [], 
     'lights'
   );
+  
+  // DEBUG: Log raw Crestron light data to see actual levels being returned
+  const sampleRawLights = rawLights.slice(0, 10);
+  console.log("[AI fetchDevices] Raw Crestron lights (sample):", sampleRawLights.map(l => ({ name: l.name, level: l.level, roomId: l.roomId })));
+  
+  // Check if ANY lights have non-zero levels
+  const lightsWithLevel = rawLights.filter(l => l.level > 0);
+  console.log("[AI fetchDevices] Lights with level > 0:", lightsWithLevel.length, "of", rawLights.length);
+  if (lightsWithLevel.length > 0) {
+    console.log("[AI fetchDevices] Lights ON:", lightsWithLevel.slice(0, 10).map(l => ({ name: l.name, level: l.level })));
+  }
+  
   const lights = rawLights.map(transformLight);
   
   // Extract and transform thermostats from raw Crestron format
