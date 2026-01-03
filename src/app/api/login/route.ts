@@ -4,12 +4,13 @@ import { getLoginUrl, generateState, generateCodeVerifier, STATE_COOKIE } from "
 const VERIFIER_COOKIE = "oauth_verifier";
 
 function getHostname(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  if (forwardedHost) {
+    return forwardedHost.split(",")[0].trim().split(":")[0];
+  }
   const host = request.headers.get("host");
   if (host && host !== "0.0.0.0" && !host.startsWith("0.0.0.0:")) {
     return host.split(":")[0];
-  }
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return process.env.REPLIT_DEV_DOMAIN;
   }
   return request.nextUrl.hostname;
 }
