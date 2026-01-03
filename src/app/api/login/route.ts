@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
     
+    console.log("Login: Setting cookies, hostname:", hostname);
+    
     return response;
   } catch (error) {
     console.error("Login error:", error);

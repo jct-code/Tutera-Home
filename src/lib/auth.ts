@@ -174,9 +174,13 @@ export async function handleCallback(callbackUrlWithParams: URL, expectedState: 
   
   const config = await getOidcConfig();
   
+  const redirectUri = `${callbackUrlWithParams.origin}/api/callback`;
+  console.log("Token exchange redirect_uri:", redirectUri);
+  
   const tokens = await client.authorizationCodeGrant(config, callbackUrlWithParams, {
     expectedState: state,
     pkceCodeVerifier: codeVerifier,
+    idTokenExpected: true,
   });
   
   const claims = tokens.claims();

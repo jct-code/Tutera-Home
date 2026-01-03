@@ -37,9 +37,15 @@ export async function GET(request: NextRequest) {
     }
     
     if (!codeVerifier) {
-      console.error("Missing PKCE code verifier");
+      console.error("Missing PKCE code verifier. Cookies received:", {
+        state: expectedState ? "present" : "missing",
+        verifier: "missing"
+      });
       return NextResponse.redirect(new URL("/login?error=invalid_state", baseUrl));
     }
+    
+    console.log("Callback: hostname detected:", hostname);
+    console.log("Callback: cookies present:", { state: !!expectedState, verifier: !!codeVerifier });
     
     const callbackUrl = new URL(`${baseUrl}/api/callback`);
     request.nextUrl.searchParams.forEach((value, key) => {
@@ -63,12 +69,22 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Callback error:", error);
+    console.error("Callback error stack:", error instanceof Error ? error.stack : "No stack");
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     
     if (errorMessage.includes("ACCESS_DENIED")) {
       return NextResponse.redirect(new URL("/login?error=access_denied", baseUrl));
     }
     
-    return NextResponse.redirect(new URL("/login?error=callback_failed", baseUrl));
+    if (errorMessage.includes("state") || errorMessage.includes("CSRF")) {
+      return NextResponse.redirect(new URL("/login?error=invalid_state", baseUrl));
+    }
+    
+    if (errorMessage.includes("redirect_uri")) {
+      return NextResponse.redirect(new URL("/login?error=redirect_mismatch", baseUrl));
+    }
+    
+    const errorCode = encodeURIComponent(errorMessage.substring(0, 100));
+    return NextResponse.redirect(new URL(`/login?error=callback_failed&detail=${errorCode}`, baseUrl));
   }
 }
