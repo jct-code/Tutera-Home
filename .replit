@@ -29,7 +29,7 @@ start = "typescript-language-server --stdio"
 
 [deployment]
 run = ["npm", "run", "start"]
-build = ["npm", "run", "build"]
+build = ["bash", "-c", "npm run build && npm run db:push"]
 deploymentTarget = "autoscale"
 
 [[ports]]
