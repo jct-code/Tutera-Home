@@ -394,7 +394,7 @@ export function generateStatusReport(
   console.log("[AI Status Report] Args:", JSON.stringify(args));
   console.log("[AI Status Report] Total lights in context:", lights.length);
   
-  // If asking about whole house lights without specific area/room, break down by area
+  // If asking about whole house lights without specific area/room, list all lights that are on
   if ((args.device_type === "lights" || args.device_type === "all") && !args.area && !args.room) {
     const allLights = lights;
     const allLightsOn = allLights.filter(l => l.isOn || l.level > 0);
@@ -407,30 +407,36 @@ export function generateStatusReport(
     } else {
       parts.push(`${allLightsOn.length} of ${allLights.length} lights are on:`);
       
-      // Get breakdown by area - each on its own line
-      for (const area of areas) {
-        const areaLights = allLights.filter(l => l.roomId && area.roomIds.includes(l.roomId));
-        const areaLightsOn = areaLights.filter(l => l.isOn || l.level > 0);
+      // Group lights by room for a cleaner display
+      const lightsByRoom = new Map<string, { roomName: string; areaName: string; lights: { name: string; brightness: number }[] }>();
+      
+      for (const light of allLightsOn) {
+        const room = rooms.find(r => r.id === light.roomId);
+        const area = areas.find(a => a.roomIds.includes(light.roomId || ''));
+        const roomKey = light.roomId || 'unknown';
         
-        if (areaLightsOn.length > 0) {
-          // Get the room names where lights are on
-          const roomsWithLightsOn = new Map<string, { name: string; lights: string[] }>();
-          for (const light of areaLightsOn) {
-            const room = rooms.find(r => r.id === light.roomId);
-            if (room) {
-              if (!roomsWithLightsOn.has(room.id)) {
-                roomsWithLightsOn.set(room.id, { name: room.name, lights: [] });
-              }
-              roomsWithLightsOn.get(room.id)!.lights.push(light.name);
-            }
-          }
-          
-          const roomDetails = Array.from(roomsWithLightsOn.values())
-            .map(r => `${r.name} (${r.lights.length})`)
-            .join(", ");
-          
-          parts.push(`• ${area.name}: ${areaLightsOn.length} lights - ${roomDetails}`);
+        if (!lightsByRoom.has(roomKey)) {
+          lightsByRoom.set(roomKey, {
+            roomName: room?.name || 'Unknown',
+            areaName: area?.name || '',
+            lights: []
+          });
         }
+        
+        const brightness = light.level > 0 ? Math.round((light.level / 65535) * 100) : 100;
+        lightsByRoom.get(roomKey)!.lights.push({ name: light.name, brightness });
+      }
+      
+      // Display lights grouped by room (limit to first 15 rooms to avoid too long responses)
+      const roomEntries = Array.from(lightsByRoom.values()).slice(0, 15);
+      for (const roomData of roomEntries) {
+        const locationInfo = roomData.areaName ? `${roomData.roomName} (${roomData.areaName})` : roomData.roomName;
+        const lightNames = roomData.lights.map(l => `${l.name} ${l.brightness}%`).join(', ');
+        parts.push(`• ${locationInfo}: ${lightNames}`);
+      }
+      
+      if (lightsByRoom.size > 15) {
+        parts.push(`• ...and ${lightsByRoom.size - 15} more rooms with lights on`);
       }
     }
   } else if (args.device_type === "lights" || args.device_type === "all") {
