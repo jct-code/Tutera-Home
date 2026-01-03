@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLoginUrl, generateState, STATE_COOKIE } from "@/lib/auth";
+import { getLoginUrl, generateState, generateCodeVerifier, STATE_COOKIE } from "@/lib/auth";
+
+const VERIFIER_COOKIE = "oauth_verifier";
 
 function getHostname(request: NextRequest): string {
   if (process.env.REPLIT_DEV_DOMAIN) {
@@ -16,14 +18,24 @@ export async function GET(request: NextRequest) {
   try {
     const hostname = getHostname(request);
     const state = generateState();
-    const loginUrl = await getLoginUrl(hostname, state);
+    const codeVerifier = generateCodeVerifier();
+    const loginUrl = await getLoginUrl(hostname, state, codeVerifier);
     
     const response = NextResponse.redirect(loginUrl);
+    
     response.cookies.set(STATE_COOKIE, state, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
-      maxAge: 10 * 60, // 10 minutes
+      maxAge: 10 * 60,
+      path: "/",
+    });
+    
+    response.cookies.set(VERIFIER_COOKIE, codeVerifier, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 10 * 60,
       path: "/",
     });
     

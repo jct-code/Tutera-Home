@@ -104,15 +104,26 @@ export function generateState(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
-export async function getLoginUrl(hostname: string, state: string): Promise<string> {
+export function generateCodeVerifier(): string {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+export function generateCodeChallenge(verifier: string): string {
+  return crypto.createHash("sha256").update(verifier).digest("base64url");
+}
+
+export async function getLoginUrl(hostname: string, state: string, codeVerifier: string): Promise<string> {
   const config = await getOidcConfig();
   const callbackUrl = `https://${hostname}/api/callback`;
+  const codeChallenge = generateCodeChallenge(codeVerifier);
   
   const authUrl = client.buildAuthorizationUrl(config, {
     redirect_uri: callbackUrl,
     scope: "openid email profile offline_access",
     prompt: "login consent",
     state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   });
   
   return authUrl.href;
@@ -133,9 +144,13 @@ function isEmailAllowed(email: string | undefined): boolean {
   return allowedList.includes(email.toLowerCase());
 }
 
-export async function handleCallback(code: string, hostname: string, state: string, expectedState: string): Promise<string> {
+export async function handleCallback(code: string, hostname: string, state: string, expectedState: string, codeVerifier: string): Promise<string> {
   if (!state || state !== expectedState) {
     throw new Error("Invalid OAuth state - possible CSRF attack");
+  }
+  
+  if (!codeVerifier) {
+    throw new Error("Missing PKCE code verifier");
   }
   
   const config = await getOidcConfig();
@@ -143,6 +158,7 @@ export async function handleCallback(code: string, hostname: string, state: stri
   
   const tokens = await client.authorizationCodeGrant(config, new URL(`${callbackUrl}?code=${code}&state=${state}`), {
     expectedState: state,
+    pkceCodeVerifier: codeVerifier,
   });
   
   const claims = tokens.claims();

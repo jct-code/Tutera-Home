@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleCallback, SESSION_COOKIE, STATE_COOKIE } from "@/lib/auth";
 
+const VERIFIER_COOKIE = "oauth_verifier";
+
 function getHostname(request: NextRequest): string {
   if (process.env.REPLIT_DEV_DOMAIN) {
     return process.env.REPLIT_DEV_DOMAIN;
@@ -17,8 +19,11 @@ export async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get("code");
     const state = request.nextUrl.searchParams.get("state");
     const expectedState = request.cookies.get(STATE_COOKIE)?.value;
+    const codeVerifier = request.cookies.get(VERIFIER_COOKIE)?.value;
     
     if (!code) {
+      const errorDesc = request.nextUrl.searchParams.get("error_description");
+      console.error("OAuth error:", errorDesc);
       return NextResponse.redirect(new URL("/login?error=no_code", request.url));
     }
     
@@ -27,19 +32,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/login?error=invalid_state", request.url));
     }
     
+    if (!codeVerifier) {
+      console.error("Missing PKCE code verifier");
+      return NextResponse.redirect(new URL("/login?error=invalid_state", request.url));
+    }
+    
     const hostname = getHostname(request);
-    const sessionId = await handleCallback(code, hostname, state, expectedState);
+    const sessionId = await handleCallback(code, hostname, state, expectedState, codeVerifier);
     
     const response = NextResponse.redirect(new URL("/", request.url));
     response.cookies.set(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 1 week
+      maxAge: 7 * 24 * 60 * 60,
       path: "/",
     });
     
     response.cookies.delete(STATE_COOKIE);
+    response.cookies.delete(VERIFIER_COOKIE);
     
     return response;
   } catch (error) {
