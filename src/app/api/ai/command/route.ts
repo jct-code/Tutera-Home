@@ -169,14 +169,31 @@ function transformThermostat(t: RawCrestronThermostat): Thermostat {
   };
 }
 
+// Helper to retry a failed API call
+async function withRetry<T>(
+  fn: () => Promise<{ success: boolean; data?: T; error?: string }>,
+  retries = 2,
+  delay = 200
+): Promise<{ success: boolean; data?: T; error?: string }> {
+  let lastResult = await fn();
+  
+  for (let i = 0; i < retries && !lastResult.success; i++) {
+    await new Promise(resolve => setTimeout(resolve, delay));
+    lastResult = await fn();
+  }
+  
+  return lastResult;
+}
+
 // Fetch all current device state
 async function fetchDeviceState(client: CrestronClient) {
+  // Use retry for critical endpoints that have intermittent 500 errors
   const [areasRes, roomsRes, lightsRes, thermostatsRes, mediaRoomsRes, scenesRes] =
     await Promise.all([
-      client.getAreas(),
-      client.getRooms(),
-      client.getLights(),
-      client.getThermostats(),
+      withRetry(() => client.getAreas()),
+      withRetry(() => client.getRooms()),
+      withRetry(() => client.getLights()),
+      withRetry(() => client.getThermostats()),
       client.getMediaRooms(),
       client.getScenes(),
     ]);
