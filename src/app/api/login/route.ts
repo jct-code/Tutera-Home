@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLoginUrl, generateState, STATE_COOKIE } from "@/lib/auth";
 
+function getHostname(request: NextRequest): string {
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return process.env.REPLIT_DEV_DOMAIN;
+  }
+  const host = request.headers.get("host");
+  if (host && host !== "0.0.0.0" && !host.startsWith("0.0.0.0:")) {
+    return host;
+  }
+  return request.nextUrl.hostname;
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const hostname = request.headers.get("host") || request.nextUrl.hostname;
+    const hostname = getHostname(request);
     const state = generateState();
     const loginUrl = await getLoginUrl(hostname, state);
     
