@@ -181,6 +181,14 @@ async function fetchDeviceState(client: CrestronClient) {
       client.getScenes(),
     ]);
 
+  // Debug: Log API response status
+  console.log("[AI fetchDeviceState] API responses:", {
+    lights: { success: lightsRes.success, error: lightsRes.error, dataType: typeof lightsRes.data, hasData: !!lightsRes.data },
+    rooms: { success: roomsRes.success, error: roomsRes.error },
+    areas: { success: areasRes.success, error: areasRes.error },
+    thermostats: { success: thermostatsRes.success, error: thermostatsRes.error },
+  });
+
   // Extract and transform lights from raw Crestron format
   const rawLights = extractArray<RawCrestronLight>(
     lightsRes.success ? lightsRes.data : [], 
