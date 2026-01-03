@@ -14,6 +14,8 @@ import {
   Layers,
   Building2,
   Music,
+  Loader2,
+  Home,
 } from "lucide-react";
 import Link from "next/link";
 import { useShallow } from "zustand/react/shallow";
@@ -37,6 +39,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useAuthStore } from "@/stores/authStore";
 import { useDeviceStore, fetchAllData, getRoomsWithStatus, getRoomZonesWithData } from "@/stores/deviceStore";
 import { useWeatherStore, fetchWeather } from "@/stores/weatherStore";
+import { useAuth } from "@/hooks/useAuth";
 
 // Animation variants
 const containerVariants = {
@@ -57,6 +60,8 @@ const itemVariants = {
 export default function Dashboard() {
   const router = useRouter();
   const { isConnected, isRefreshingAuth } = useAuthStore();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  
   // Use useShallow to prevent re-renders when object references change but values are the same
   const { 
     areas,
@@ -95,12 +100,14 @@ export default function Dashboard() {
     fetchWeather();
   }, []);
 
-  // Redirect to login if not connected (but not while refreshing auth)
+  // Redirect to login if not authenticated or not connected (but not while loading)
   useEffect(() => {
-    if (!isConnected && !isRefreshingAuth) {
+    if (isAuthLoading || isRefreshingAuth) return;
+    
+    if (!isAuthenticated || !isConnected) {
       router.push("/login");
     }
-  }, [isConnected, isRefreshingAuth, router]);
+  }, [isAuthenticated, isAuthLoading, isConnected, isRefreshingAuth, router]);
 
   // Separate actual lights from equipment controls (Fan, Fountain, Heater, etc.)
   const { actualLights: filteredLights, equipment: filteredEquipment } = useMemo(
@@ -174,7 +181,24 @@ export default function Dashboard() {
     setExpandedZoneId(prev => prev === zoneId ? null : zoneId);
   };
 
-  if (!isConnected) {
+  // Show loading while checking auth
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--accent)] mb-4">
+            <Home className="w-8 h-8 text-white" />
+          </div>
+          <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Loading...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected || !isAuthenticated) {
     return null; // Will redirect
   }
 

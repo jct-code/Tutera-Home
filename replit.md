@@ -52,8 +52,31 @@ Since Replit runs in the cloud, it cannot directly reach devices on your private
 ## Environment Variables
 - `CRESTRON_HOME_KEY` - Authorization token for Crestron Home API (optional)
 - `OPENAI_API_KEY` - For AI command features
+- `SESSION_SECRET` - Secret for session encryption
+- `DATABASE_URL` - PostgreSQL database connection (auto-provided by Replit)
+
+## Authentication
+The app uses Replit Auth for secure multi-user authentication:
+- Sign in with Apple, Google, or email
+- Sessions stored in PostgreSQL database
+- Family members can access from iPhone (Apple ID), desktop, and Android
+
+### Authentication Flow
+1. User visits the app and sees the "Tutera Home" welcome screen
+2. Clicks "Sign In" to authenticate via Replit Auth (Apple/Google/email)
+3. After authentication, connects to the Crestron processor
+4. Dashboard is accessible only to authenticated users
+
+### Auth Files
+- `src/lib/auth.ts` - OIDC client and session management
+- `src/lib/schema.ts` - Database schema for users and sessions
+- `src/app/api/login/route.ts` - Login redirect to OIDC provider
+- `src/app/api/callback/route.ts` - OIDC callback handler
+- `src/app/api/logout/route.ts` - Logout handler
+- `src/app/api/auth/user/route.ts` - Get current user
+- `src/hooks/useAuth.ts` - Client-side auth hook
 
 ## Configuration
 - The app connects to a Crestron Home processor via IP address
-- Users configure the processor IP on the login page
+- Users configure the processor IP after logging in
 - The processor must be accessible from the network where this app runs

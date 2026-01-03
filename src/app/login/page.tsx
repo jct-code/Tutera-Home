@@ -3,54 +3,65 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, Wifi, Key, AlertCircle, Loader2 } from "lucide-react";
+import { Home, Wifi, Key, AlertCircle, Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useAuthStore, login } from "@/stores/authStore";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
   const { isConnecting, error, isConnected, setConnection } = useAuthStore();
+  const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
   
   const [processorIp, setProcessorIp] = useState("");
   const [authToken, setAuthToken] = useState("");
   const [localError, setLocalError] = useState("");
   const [isAutoConnecting, setIsAutoConnecting] = useState(true);
 
-  // Check for auto-connect on mount
+  // If user is authenticated and connected to Crestron, redirect to dashboard
   useEffect(() => {
+    if (isAuthenticated && isConnected) {
+      router.push("/");
+    }
+  }, [isAuthenticated, isConnected, router]);
+
+  // Check for auto-connect on mount (only if authenticated)
+  useEffect(() => {
+    if (isAuthLoading) return;
+    
+    if (!isAuthenticated) {
+      setIsAutoConnecting(false);
+      return;
+    }
+
     const checkAutoConnect = async () => {
-      // If already connected (from persisted state), just redirect
       if (isConnected) {
         router.push("/");
         return;
       }
 
       try {
-        // Try to get a fresh auth key from the config endpoint
         const response = await fetch("/api/crestron/config");
         const data = await response.json();
 
         if (data.autoConnectAvailable && data.processorIp && data.authKey) {
-          // Auto-connect successful, set connection and redirect
           setConnection(data.processorIp, data.authKey, undefined, data.authTokenFromEnv || false);
           router.push("/");
           return;
         }
         
-        // If auto-connect failed but we have env values, pre-fill the form
         if (data.envProcessorIp) {
           setProcessorIp(data.envProcessorIp);
         }
       } catch (err) {
-        // Silently fail - user can connect manually
         console.error("Auto-connect check failed:", err);
       }
       setIsAutoConnecting(false);
     };
 
     checkAutoConnect();
-  }, [router, setConnection, isConnected]);
+  }, [router, setConnection, isConnected, isAuthenticated, isAuthLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +72,6 @@ export default function LoginPage() {
       return;
     }
 
-    // authToken is now optional - will use ENV variable if not provided
     const success = await login(processorIp.trim(), authToken.trim() || "");
     if (success) {
       router.push("/");
@@ -70,8 +80,8 @@ export default function LoginPage() {
 
   const displayError = localError || error;
 
-  // Show loading while checking auto-connect
-  if (isAutoConnecting) {
+  // Show loading while checking auth
+  if (isAuthLoading || isAutoConnecting) {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
         <motion.div
@@ -87,13 +97,76 @@ export default function LoginPage() {
           </h1>
           <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Connecting...</span>
+            <span>Loading...</span>
           </div>
         </motion.div>
       </div>
     );
   }
 
+  // Show login button if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-md"
+        >
+          <div className="text-center mb-8">
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+              className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--accent)] mb-4"
+            >
+              <Home className="w-10 h-10 text-white" />
+            </motion.div>
+            <h1 className="text-3xl font-bold text-[var(--text-primary)]">
+              Tutera Home
+            </h1>
+            <p className="text-[var(--text-secondary)] mt-2">
+              Smart Home Control
+            </p>
+          </div>
+
+          <Card padding="lg" className="shadow-[var(--shadow-lg)]">
+            <div className="text-center space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
+                  Welcome
+                </h2>
+                <p className="text-[var(--text-secondary)]">
+                  Sign in to control your home
+                </p>
+              </div>
+
+              <a
+                href="/api/login"
+                className="
+                  flex items-center justify-center gap-3 w-full py-4 px-6
+                  bg-[var(--accent)] hover:bg-[var(--accent-hover)]
+                  text-white font-semibold rounded-xl
+                  transition-all duration-200
+                  shadow-lg hover:shadow-xl
+                "
+              >
+                <LogIn className="w-5 h-5" />
+                Sign In
+              </a>
+
+              <p className="text-sm text-[var(--text-tertiary)]">
+                Sign in with Apple, Google, or email
+              </p>
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // User is authenticated, show Crestron connection form
   return (
     <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
       <motion.div
@@ -102,7 +175,6 @@ export default function LoginPage() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-md"
       >
-        {/* Logo and Title */}
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0.8 }}
@@ -113,17 +185,15 @@ export default function LoginPage() {
             <Home className="w-8 h-8 text-white" />
           </motion.div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-            Crestron Home
+            Connect to Crestron
           </h1>
           <p className="text-[var(--text-secondary)] mt-2">
-            Connect to your smart home system
+            Welcome back, {user?.firstName || user?.email || "User"}
           </p>
         </div>
 
-        {/* Login Card */}
         <Card padding="lg" className="shadow-[var(--shadow-lg)]">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Processor IP */}
             <div>
               <label
                 htmlFor="processorIp"
@@ -157,7 +227,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Auth Token */}
             <div>
               <label
                 htmlFor="authToken"
@@ -191,7 +260,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Error Message */}
             {displayError && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -202,16 +270,9 @@ export default function LoginPage() {
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{displayError}</span>
                 </div>
-                {displayError.toLowerCase().includes('timeout') && (
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                    💡 If using VPN, try disconnecting and reconnecting it. 
-                    You may also need to restart the Crestron processor.
-                  </p>
-                )}
               </motion.div>
             )}
 
-            {/* Submit Button */}
             <Button
               type="submit"
               className="w-full"
@@ -230,12 +291,15 @@ export default function LoginPage() {
           </form>
         </Card>
 
-        {/* Help Text */}
-        <p className="text-center text-sm text-[var(--text-tertiary)] mt-6">
-          Make sure you&apos;re on the same network as your Crestron processor
-        </p>
+        <div className="text-center mt-4">
+          <a
+            href="/api/logout"
+            className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+          >
+            Sign out
+          </a>
+        </div>
       </motion.div>
     </div>
   );
 }
-
