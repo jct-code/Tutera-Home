@@ -9,12 +9,23 @@ interface CommandUsage {
   lastUsed: number; // timestamp
 }
 
+interface RecentActivity {
+  room?: string;
+  area?: string;
+  deviceType?: string; // 'light', 'thermostat', etc.
+  action?: string; // 'on', 'off', 'dim', etc.
+  timestamp: number;
+}
+
 interface SuggestionState {
   // AI-provided contextual suggestions (updated per response)
   contextualSuggestions: string[];
   
   // User's frequently used commands
   frequentCommands: CommandUsage[];
+  
+  // Recent activity for context-aware suggestions
+  recentActivities: RecentActivity[];
   
   // Default suggestions when nothing else is available
   defaultSuggestions: string[];
@@ -23,6 +34,8 @@ interface SuggestionState {
   setContextualSuggestions: (suggestions: string[]) => void;
   clearContextualSuggestions: () => void;
   recordCommand: (command: string) => void;
+  recordActivity: (activity: Omit<RecentActivity, 'timestamp'>) => void;
+  getRecentContext: () => { rooms: string[]; areas: string[]; actions: string[] };
   getTopSuggestions: (limit?: number) => string[];
   resetFrequentCommands: () => void;
 }
@@ -43,6 +56,7 @@ export const useSuggestionStore = create<SuggestionState>()(
     (set, get) => ({
       contextualSuggestions: [],
       frequentCommands: [],
+      recentActivities: [],
       defaultSuggestions: DEFAULT_SUGGESTIONS,
 
       setContextualSuggestions: (suggestions) => {
@@ -92,6 +106,30 @@ export const useSuggestionStore = create<SuggestionState>()(
         });
       },
 
+      recordActivity: (activity) => {
+        set((state) => {
+          const newActivity = { ...activity, timestamp: Date.now() };
+          // Keep last 20 activities
+          const updated = [newActivity, ...state.recentActivities].slice(0, 20);
+          return { recentActivities: updated };
+        });
+      },
+
+      getRecentContext: () => {
+        const state = get();
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+        
+        // Get activities from last 5 minutes
+        const recent = state.recentActivities.filter(a => a.timestamp > fiveMinutesAgo);
+        
+        // Extract unique rooms, areas, and actions
+        const rooms = [...new Set(recent.map(a => a.room).filter(Boolean))] as string[];
+        const areas = [...new Set(recent.map(a => a.area).filter(Boolean))] as string[];
+        const actions = [...new Set(recent.map(a => a.action).filter(Boolean))] as string[];
+        
+        return { rooms, areas, actions };
+      },
+
       getTopSuggestions: (limit = 6) => {
         const state = get();
         
@@ -131,13 +169,14 @@ export const useSuggestionStore = create<SuggestionState>()(
       },
 
       resetFrequentCommands: () => {
-        set({ frequentCommands: [], contextualSuggestions: [] });
+        set({ frequentCommands: [], contextualSuggestions: [], recentActivities: [] });
       },
     }),
     {
       name: "ai-suggestions",
       partialize: (state) => ({
         frequentCommands: state.frequentCommands,
+        recentActivities: state.recentActivities,
       }),
     }
   )

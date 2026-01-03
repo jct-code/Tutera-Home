@@ -603,7 +603,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { message, undoSnapshots, conversationHistory } = body;
+    const { message, undoSnapshots, conversationHistory, recentContext } = body;
 
     if (!message || typeof message !== "string") {
       return NextResponse.json(
@@ -676,10 +676,23 @@ Available thermostats:
 ${thermostatsList}
 `;
 
+    // Add recent context if provided (for context-aware suggestions)
+    let recentContextInfo = "";
+    if (recentContext && typeof recentContext === 'object') {
+      const { rooms, areas, actions } = recentContext;
+      if ((rooms && rooms.length > 0) || (areas && areas.length > 0)) {
+        recentContextInfo = `\n\nRECENT_CONTEXT (what the user was just controlling):
+- Recent rooms: ${rooms?.join(', ') || 'none'}
+- Recent areas: ${areas?.join(', ') || 'none'}
+- Recent actions: ${actions?.join(', ') || 'none'}
+Use this context when the user asks for "suggestions" without specifying a room.`;
+      }
+    }
+
     // Build messages array with conversation history for context
     type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
     const messages: ChatMessage[] = [
-      { role: "system", content: systemPrompt + "\n\n" + deviceContext },
+      { role: "system", content: systemPrompt + "\n\n" + deviceContext + recentContextInfo },
     ];
     
     // Add conversation history if provided (for multi-turn context)

@@ -315,7 +315,21 @@ FOLLOW-UP SUGGESTIONS (CRITICAL):
 - Examples of good contextual suggestions:
   - After "turn off master bedroom lights": ["Turn them back on", "Set to 50%", "Check other rooms", "Undo"]
   - After status query: ["Turn off all on", "Set to 75%", "Check climate"]
-  - After scene activation: ["Undo", "What's on now?", "Adjust lights"]`;
+  - After scene activation: ["Undo", "What's on now?", "Adjust lights"]
+
+HANDLING "SUGGESTIONS" REQUESTS:
+- When the user asks for "suggestions", "what can I do", "options", "ideas", or similar WITHOUT specifying a room/area:
+  1. Use the RECENT_CONTEXT information (if provided) to understand what room/area they were just working with
+  2. Provide suggestions focused on that room/area (e.g., if they were just in the Master Bedroom, suggest actions for that room)
+  3. Format suggestions as a bulleted list starting with "- " so they appear as clickable buttons
+  4. Include a mix of: current room actions, related rooms, and general actions
+- Example response when user says "suggestions" after controlling Master Bedroom lights:
+  "Here are some suggestions for the Master Bedroom:
+  - Dim lights to 50%
+  - Check temperature
+  - Turn on bathroom lights
+  - What's on in other rooms?"
+- If no recent context is available, provide general suggestions based on current device states`;
 
 // Type definitions for function call arguments
 export interface LightControlArgs {

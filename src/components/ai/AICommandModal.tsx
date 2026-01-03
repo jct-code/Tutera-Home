@@ -111,7 +111,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
   const { getAuthHeaders } = useAuthStore();
   const { addCommand, markUndone, getLastUndoableCommand, getSnapshotsForUndo } =
     useCommandHistoryStore();
-  const { setContextualSuggestions, recordCommand, getTopSuggestions, clearContextualSuggestions } =
+  const { setContextualSuggestions, recordCommand, getTopSuggestions, clearContextualSuggestions, recordActivity, getRecentContext } =
     useSuggestionStore();
   
   // Get current suggestions (reactive)
@@ -302,6 +302,9 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
           content: msg.content,
         }));
       
+      // Get recent context for context-aware suggestions
+      const recentContext = getRecentContext();
+      
       const response = await fetch("/api/ai/command", {
         method: "POST",
         headers: {
@@ -311,6 +314,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
         body: JSON.stringify({ 
           message: messageText,
           conversationHistory: historyForAPI,
+          recentContext,
         }),
       });
       
@@ -344,6 +348,19 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
               aiResponse: data.response,
               actions: data.actions,
             });
+            
+            // Record activity for context-aware suggestions
+            for (const action of data.actions) {
+              const args = action.args || {};
+              if (args.room || args.area) {
+                recordActivity({
+                  room: args.room,
+                  area: args.area,
+                  deviceType: action.type || 'light',
+                  action: args.action,
+                });
+              }
+            }
           }
           
           setConversation((prev) => [
@@ -386,7 +403,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
     } finally {
       setIsProcessing(false);
     }
-  }, [input, isProcessing, getAuthHeaders, addCommand, conversation, recordCommand, setContextualSuggestions, clearContextualSuggestions]);
+  }, [input, isProcessing, getAuthHeaders, addCommand, conversation, recordCommand, setContextualSuggestions, clearContextualSuggestions, recordActivity, getRecentContext]);
 
   // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent) => {
