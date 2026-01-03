@@ -72,9 +72,37 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
-  const [conversation, setConversation] = useState<ConversationItem[]>([]);
+  const [conversation, setConversation] = useState<ConversationItem[]>(() => {
+    // Restore conversation from sessionStorage on mount
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('ai-chat-history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return parsed.map((item: ConversationItem) => ({
+            ...item,
+            timestamp: new Date(item.timestamp),
+          }));
+        }
+      } catch (e) {
+        console.error('Failed to restore chat history:', e);
+      }
+    }
+    return [];
+  });
   const [error, setError] = useState<string | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
+  
+  // Save conversation to sessionStorage whenever it changes
+  useEffect(() => {
+    if (conversation.length > 0) {
+      try {
+        sessionStorage.setItem('ai-chat-history', JSON.stringify(conversation));
+      } catch (e) {
+        console.error('Failed to save chat history:', e);
+      }
+    }
+  }, [conversation]);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -359,11 +387,37 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
     }
   };
 
-  const formatMessage = (content: string) => {
+  const formatMessage = (content: string, onSuggestionClick?: (text: string) => void) => {
     const lines = content.split('\n');
+    let inSuggestionSection = false;
+    
     return lines.map((line, index) => {
       const isBullet = line.trim().startsWith('•');
       const isHeader = line.includes(':') && !isBullet && index === 0;
+      const isSuggestionHeader = line.toLowerCase().includes('suggestion') || 
+                                  line.toLowerCase().includes('you could') ||
+                                  line.toLowerCase().includes('try:');
+      const isDashSuggestion = line.trim().startsWith('- ') && !line.includes(':');
+      
+      // Track if we're in a suggestion section
+      if (isSuggestionHeader) {
+        inSuggestionSection = true;
+      }
+      
+      // Render dash suggestions as clickable buttons
+      if (isDashSuggestion && onSuggestionClick) {
+        const suggestionText = line.replace(/^[\s-]+/, '').trim();
+        return (
+          <button
+            key={index}
+            onClick={() => onSuggestionClick(suggestionText)}
+            className="flex items-center gap-2 py-1.5 px-3 my-1 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 rounded-lg text-[var(--accent)] transition-colors text-left w-full"
+          >
+            <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{suggestionText}</span>
+          </button>
+        );
+      }
       
       if (isBullet) {
         return (
@@ -382,6 +436,15 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
         );
       }
       
+      // Suggestion section header styling
+      if (isSuggestionHeader) {
+        return (
+          <div key={index} className="font-medium text-sm text-[var(--text-secondary)] mt-3 mb-1">
+            {line}
+          </div>
+        );
+      }
+      
       return (
         <div key={index} className={index > 0 ? 'mt-1' : ''}>
           {line}
@@ -389,6 +452,14 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
       );
     });
   };
+  
+  // Handle clicking an inline suggestion
+  const handleInlineSuggestionClick = useCallback((text: string) => {
+    if (!isProcessing) {
+      setInput(text);
+      handleSubmit(text);
+    }
+  }, [isProcessing, handleSubmit]);
 
   return (
     <AnimatePresence>
@@ -474,7 +545,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
                       }`}
                     >
                       <div className="text-base leading-relaxed">
-                        {item.type === "assistant" ? formatMessage(item.content) : item.content}
+                        {item.type === "assistant" ? formatMessage(item.content, handleInlineSuggestionClick) : item.content}
                       </div>
                       {item.type === "assistant" && item.canUndo && item.commandStoreId && (
                         <button
