@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 5000",
     "build": "next build",
-    "build:deploy": "next build && drizzle-kit push",
+    "build:deploy": "next build && drizzle-kit push --force",
     "start": "next start -H 0.0.0.0 -p 5000",
     "lint": "eslint",
     "db:push": "drizzle-kit push"
