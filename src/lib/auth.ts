@@ -70,18 +70,33 @@ export async function getUser(id: string): Promise<User | undefined> {
 }
 
 export async function upsertUser(userData: UpsertUser): Promise<User> {
-  const [user] = await db
-    .insert(users)
-    .values(userData)
-    .onConflictDoUpdate({
-      target: users.id,
-      set: {
-        ...userData,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-  return user;
+  try {
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: userData.id,
+        email: userData.email || null,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        profileImageUrl: userData.profileImageUrl || null,
+      })
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          email: userData.email || null,
+          firstName: userData.firstName || null,
+          lastName: userData.lastName || null,
+          profileImageUrl: userData.profileImageUrl || null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  } catch (error) {
+    console.error("upsertUser error:", error);
+    console.error("userData:", JSON.stringify(userData, null, 2));
+    throw new Error(`Failed to save user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function getCurrentUser(): Promise<User | null> {
