@@ -399,7 +399,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 touch-none"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50"
             onClick={onClose}
           />
           
@@ -437,9 +437,7 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
             {/* Conversation Area - Flexible height */}
             <div
               ref={conversationRef}
-              className="flex-1 overflow-y-auto p-6 space-y-4 overscroll-contain"
-              style={{ WebkitOverflowScrolling: 'touch' }}
-              onTouchMove={(e) => e.stopPropagation()}
+              className="flex-1 overflow-y-auto p-6 space-y-4"
             >
               {conversation.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
