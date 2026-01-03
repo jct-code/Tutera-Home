@@ -38,7 +38,12 @@ export async function GET(request: NextRequest) {
     }
     
     const hostname = getHostname(request);
-    const sessionId = await handleCallback(code, hostname, state, expectedState, codeVerifier);
+    const callbackUrl = new URL(`https://${hostname}/api/callback`);
+    request.nextUrl.searchParams.forEach((value, key) => {
+      callbackUrl.searchParams.set(key, value);
+    });
+    
+    const sessionId = await handleCallback(callbackUrl, expectedState, codeVerifier);
     
     const response = NextResponse.redirect(new URL("/", request.url));
     response.cookies.set(SESSION_COOKIE, sessionId, {

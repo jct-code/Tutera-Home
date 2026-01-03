@@ -144,7 +144,9 @@ function isEmailAllowed(email: string | undefined): boolean {
   return allowedList.includes(email.toLowerCase());
 }
 
-export async function handleCallback(code: string, hostname: string, state: string, expectedState: string, codeVerifier: string): Promise<string> {
+export async function handleCallback(callbackUrlWithParams: URL, expectedState: string, codeVerifier: string): Promise<string> {
+  const state = callbackUrlWithParams.searchParams.get("state");
+  
   if (!state || state !== expectedState) {
     throw new Error("Invalid OAuth state - possible CSRF attack");
   }
@@ -154,9 +156,8 @@ export async function handleCallback(code: string, hostname: string, state: stri
   }
   
   const config = await getOidcConfig();
-  const callbackUrl = `https://${hostname}/api/callback`;
   
-  const tokens = await client.authorizationCodeGrant(config, new URL(`${callbackUrl}?code=${code}&state=${state}`), {
+  const tokens = await client.authorizationCodeGrant(config, callbackUrlWithParams, {
     expectedState: state,
     pkceCodeVerifier: codeVerifier,
   });
