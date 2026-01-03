@@ -16,8 +16,10 @@ function getHostname(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest) {
+  const hostname = getHostname(request);
+  const baseUrl = `https://${hostname}`;
+  
   try {
-    const hostname = getHostname(request);
     const state = generateState();
     const codeVerifier = generateCodeVerifier();
     const loginUrl = await getLoginUrl(hostname, state, codeVerifier);
@@ -43,6 +45,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.redirect(new URL("/login?error=auth_failed", request.url));
+    return NextResponse.redirect(new URL("/login?error=auth_failed", baseUrl));
   }
 }

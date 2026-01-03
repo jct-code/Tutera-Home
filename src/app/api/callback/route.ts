@@ -16,6 +16,9 @@ function getHostname(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest) {
+  const hostname = getHostname(request);
+  const baseUrl = `https://${hostname}`;
+  
   try {
     const code = request.nextUrl.searchParams.get("code");
     const state = request.nextUrl.searchParams.get("state");
@@ -25,28 +28,27 @@ export async function GET(request: NextRequest) {
     if (!code) {
       const errorDesc = request.nextUrl.searchParams.get("error_description");
       console.error("OAuth error:", errorDesc);
-      return NextResponse.redirect(new URL("/login?error=no_code", request.url));
+      return NextResponse.redirect(new URL("/login?error=no_code", baseUrl));
     }
     
     if (!state || !expectedState) {
       console.error("Missing OAuth state");
-      return NextResponse.redirect(new URL("/login?error=invalid_state", request.url));
+      return NextResponse.redirect(new URL("/login?error=invalid_state", baseUrl));
     }
     
     if (!codeVerifier) {
       console.error("Missing PKCE code verifier");
-      return NextResponse.redirect(new URL("/login?error=invalid_state", request.url));
+      return NextResponse.redirect(new URL("/login?error=invalid_state", baseUrl));
     }
     
-    const hostname = getHostname(request);
-    const callbackUrl = new URL(`https://${hostname}/api/callback`);
+    const callbackUrl = new URL(`${baseUrl}/api/callback`);
     request.nextUrl.searchParams.forEach((value, key) => {
       callbackUrl.searchParams.set(key, value);
     });
     
     const sessionId = await handleCallback(callbackUrl, expectedState, codeVerifier);
     
-    const response = NextResponse.redirect(new URL("/", request.url));
+    const response = NextResponse.redirect(new URL("/", baseUrl));
     response.cookies.set(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       secure: true,
@@ -64,9 +66,9 @@ export async function GET(request: NextRequest) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     
     if (errorMessage.includes("ACCESS_DENIED")) {
-      return NextResponse.redirect(new URL("/login?error=access_denied", request.url));
+      return NextResponse.redirect(new URL("/login?error=access_denied", baseUrl));
     }
     
-    return NextResponse.redirect(new URL("/login?error=callback_failed", request.url));
+    return NextResponse.redirect(new URL("/login?error=callback_failed", baseUrl));
   }
 }
