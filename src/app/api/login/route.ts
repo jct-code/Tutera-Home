@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLoginUrl, generateState, generateCodeVerifier, STATE_COOKIE } from "@/lib/auth";
+import { getLoginUrlSimple, STATE_COOKIE } from "@/lib/auth-simple";
 
 const VERIFIER_COOKIE = "oauth_verifier";
 
@@ -20,11 +20,10 @@ export async function GET(request: NextRequest) {
   const baseUrl = `https://${hostname}`;
   
   try {
-    const state = generateState();
-    const codeVerifier = generateCodeVerifier();
-    const loginUrl = await getLoginUrl(hostname, state, codeVerifier);
+    const callbackUrl = `${baseUrl}/api/callback`;
+    const { url, state, codeVerifier } = await getLoginUrlSimple(callbackUrl);
     
-    const response = NextResponse.redirect(loginUrl);
+    const response = NextResponse.redirect(url);
     
     response.cookies.set(STATE_COOKIE, state, {
       httpOnly: true,
@@ -41,8 +40,6 @@ export async function GET(request: NextRequest) {
       maxAge: 10 * 60,
       path: "/",
     });
-    
-    console.log("Login: Setting cookies, hostname:", hostname);
     
     return response;
   } catch (error) {

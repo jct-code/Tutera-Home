@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleCallback, SESSION_COOKIE, STATE_COOKIE } from "@/lib/auth";
+import { handleCallbackSimple, STATE_COOKIE, SESSION_COOKIE, USER_DATA_COOKIE, encodeUserData } from "@/lib/auth-simple";
 
 const VERIFIER_COOKIE = "oauth_verifier";
 
@@ -37,25 +37,28 @@ export async function GET(request: NextRequest) {
     }
     
     if (!codeVerifier) {
-      console.error("Missing PKCE code verifier. Cookies received:", {
-        state: expectedState ? "present" : "missing",
-        verifier: "missing"
-      });
+      console.error("Missing PKCE code verifier");
       return NextResponse.redirect(new URL("/login?error=invalid_state", baseUrl));
     }
-    
-    console.log("Callback: hostname detected:", hostname);
-    console.log("Callback: cookies present:", { state: !!expectedState, verifier: !!codeVerifier });
     
     const callbackUrl = new URL(`${baseUrl}/api/callback`);
     request.nextUrl.searchParams.forEach((value, key) => {
       callbackUrl.searchParams.set(key, value);
     });
     
-    const sessionId = await handleCallback(callbackUrl, expectedState, codeVerifier);
+    const { sessionId, user } = await handleCallbackSimple(callbackUrl, expectedState, codeVerifier);
     
     const response = NextResponse.redirect(new URL("/", baseUrl));
+    
     response.cookies.set(SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60,
+      path: "/",
+    });
+    
+    response.cookies.set(USER_DATA_COOKIE, encodeUserData(user), {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
@@ -69,7 +72,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Callback error:", error);
-    console.error("Callback error stack:", error instanceof Error ? error.stack : "No stack");
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     
     if (errorMessage.includes("ACCESS_DENIED")) {
@@ -78,10 +80,6 @@ export async function GET(request: NextRequest) {
     
     if (errorMessage.includes("state") || errorMessage.includes("CSRF")) {
       return NextResponse.redirect(new URL("/login?error=invalid_state", baseUrl));
-    }
-    
-    if (errorMessage.includes("redirect_uri")) {
-      return NextResponse.redirect(new URL("/login?error=redirect_mismatch", baseUrl));
     }
     
     const errorCode = encodeURIComponent(errorMessage.substring(0, 100));
