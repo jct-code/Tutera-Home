@@ -603,6 +603,14 @@ export async function POST(request: NextRequest) {
     // Fetch current device state
     const deviceState = await fetchDeviceState(client);
     
+    // Debug: Log light status summary for AI requests
+    const lightsOn = deviceState.lights.filter(l => l.level > 0);
+    console.log("[AI fetchDeviceState] Total lights:", deviceState.lights.length);
+    console.log("[AI fetchDeviceState] Lights ON (level > 0):", lightsOn.length);
+    if (lightsOn.length > 0) {
+      console.log("[AI fetchDeviceState] Sample ON lights:", lightsOn.slice(0, 5).map(l => ({ name: l.name, level: l.level, isOn: l.isOn })));
+    }
+    
     // Debug: Log thermostat names
     console.log("Available thermostats:", deviceState.thermostats.map(t => ({ name: t.name, id: t.id, roomId: t.roomId, currentTemp: t.currentTemp })));
 
