@@ -192,6 +192,18 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
     }
   }, [conversation]);
 
+  // Scroll to bottom on initial load when chat history is restored
+  useEffect(() => {
+    if (isOpen && conversationRef.current && conversation.length > 0) {
+      // Use setTimeout to ensure DOM is fully rendered
+      setTimeout(() => {
+        if (conversationRef.current) {
+          conversationRef.current.scrollTop = conversationRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+  }, [isOpen]);
+
   // Toggle voice recording
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) return;
@@ -394,9 +406,16 @@ export function AICommandModal({ isOpen, onClose }: AICommandModalProps) {
     return lines.map((line, index) => {
       const isBullet = line.trim().startsWith('•');
       const isHeader = line.includes(':') && !isBullet && index === 0;
-      const isSuggestionHeader = line.toLowerCase().includes('suggestion') || 
-                                  line.toLowerCase().includes('you could') ||
-                                  line.toLowerCase().includes('try:');
+      const lineLower = line.toLowerCase();
+      const isSuggestionHeader = lineLower.includes('suggestion') || 
+                                  lineLower.includes('you could') ||
+                                  lineLower.includes('try:') ||
+                                  lineLower.includes('option') ||
+                                  lineLower.includes('recommend') ||
+                                  lineLower.includes('would you like') ||
+                                  lineLower.includes('you can') ||
+                                  lineLower.includes('here are') ||
+                                  lineLower.includes('for example');
       const isDashSuggestion = line.trim().startsWith('- ') && !line.includes(':');
       
       // Track if we're in a suggestion section
