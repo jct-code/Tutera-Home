@@ -464,10 +464,23 @@ export function generateStatusReport(
   if (args.device_type === "climate" || args.device_type === "all") {
     const targetDesc = args.room || args.area || "the house";
     const thermostats = getMatchingThermostats(args, context);
+    
+    // Helper to get a meaningful name for a thermostat (use room name if thermostat name is generic)
+    const getThermostatDisplayName = (t: Thermostat): string => {
+      const genericNames = ['thermostat', 'hvac', 'climate'];
+      const isGeneric = genericNames.some(g => t.name.toLowerCase() === g);
+      if (isGeneric && t.roomId) {
+        const room = rooms.find(r => r.id === t.roomId);
+        if (room) return room.name;
+      }
+      return t.name;
+    };
+    
     if (thermostats.length > 0) {
       if (thermostats.length === 1) {
         // Single thermostat - give detailed info
         const t = thermostats[0];
+        const displayName = getThermostatDisplayName(t);
         const setPointInfo = t.mode === 'heat' 
           ? `set to ${t.heatSetPoint}°F` 
           : t.mode === 'cool' 
@@ -475,7 +488,7 @@ export function generateStatusReport(
             : t.mode === 'auto'
               ? `heat: ${t.heatSetPoint}°F, cool: ${t.coolSetPoint}°F`
               : 'off';
-        parts.push(`${t.name}: ${t.currentTemp}°F, ${t.mode} mode, ${setPointInfo}`);
+        parts.push(`${displayName}: ${t.currentTemp}°F, ${t.mode} mode, ${setPointInfo}`);
       } else {
         // Multiple thermostats - each on its own line
         const avgTemp = Math.round(
@@ -483,7 +496,8 @@ export function generateStatusReport(
         );
         parts.push(`Climate in ${targetDesc} (avg ${avgTemp}°F):`);
         for (const t of thermostats) {
-          parts.push(`• ${t.name}: ${t.currentTemp}°F (${t.mode})`);
+          const displayName = getThermostatDisplayName(t);
+          parts.push(`• ${displayName}: ${t.currentTemp}°F (${t.mode})`);
         }
       }
     }
