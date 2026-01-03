@@ -63,11 +63,12 @@ The app uses Replit Auth for secure multi-user authentication:
 - **Access restricted to approved email addresses only**
 
 ### Allowed Users
-To control who can access the app, set the `ALLOWED_USERS` environment variable:
-- Comma-separated list of email addresses
-- Example: `joetutera@gmail.com,family@example.com,guest@example.com`
-- If not set, all authenticated users are allowed
-- Currently configured: joetutera@gmail.com
+Access is managed through a database-based allowlist:
+- **Admin** (joetutera@gmail.com) always has access and can manage all users
+- **User Management UI** in Settings page allows adding family members
+- Any authenticated user can add new emails to the approved list
+- Only the admin can remove users from the approved list
+- Database table: `allowed_users` stores email, addedBy, and createdAt
 
 ### Authentication Flow
 1. User visits the app and sees the "Tutera Home" welcome screen

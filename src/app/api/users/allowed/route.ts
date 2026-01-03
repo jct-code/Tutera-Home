@@ -3,8 +3,7 @@ import { db } from "@/lib/db";
 import { allowedUsers } from "@/lib/schema";
 import { getCurrentUserFromRequest } from "@/lib/auth";
 import { eq } from "drizzle-orm";
-
-const ADMIN_EMAIL = "joetutera@gmail.com";
+import { ADMIN_EMAIL } from "@/lib/config";
 
 export async function GET(request: NextRequest) {
   try {

@@ -5,6 +5,7 @@ import { users, sessions, allowedUsers } from "./schema";
 import { eq } from "drizzle-orm";
 import type { User, UpsertUser } from "./schema";
 import crypto from "crypto";
+import { ADMIN_EMAIL } from "./config";
 
 const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 const SESSION_COOKIE = "session_id";
@@ -144,8 +145,6 @@ export async function getLoginUrl(hostname: string, state: string, codeVerifier:
   
   return authUrl.href;
 }
-
-const ADMIN_EMAIL = "joetutera@gmail.com";
 
 async function isEmailAllowed(email: string | undefined): Promise<boolean> {
   if (!email) {
