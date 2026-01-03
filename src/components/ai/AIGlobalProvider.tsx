@@ -60,10 +60,14 @@ export function AIGlobalProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleAI]);
 
+  // Keep modal mounted once opened to preserve conversation state
+  // Only check canAccessAI when opening, not for unmounting
+  const shouldRenderModal = canAccessAI || isOpen;
+
   return (
     <AIContext.Provider value={{ openAI, closeAI, toggleAI, isOpen }}>
       {children}
-      {canAccessAI && (
+      {shouldRenderModal && (
         <AICommandModal isOpen={isOpen} onClose={closeAI} />
       )}
     </AIContext.Provider>
